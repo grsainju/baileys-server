@@ -8,6 +8,10 @@ const CLOVER_TOKEN = 'cea0b142-7593-6c1e-5e79-f1ae5ddbd603';
 const MERCHANT_ID = 'J5D10DJ83FVD1';
 const PORT = process.env.PORT || 3000;
 
+// Supabase config
+const SUPABASE_URL = 'https://wntikhzvhybqhocqizuc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndudGlraHp2aHlicWhvY3FpenVjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTgzODgwOCwiZXhwIjoyMDkxNDE0ODA4fQ.jdW3GBVsC6pmQUWq1450W2jB1MiyJEcaMnLunHBcOic';
+
 const ALLOWED_ORIGINS = [
   'https://daily.soldierfitclarksburg.com',
   'http://localhost:3000',
@@ -21,19 +25,45 @@ function setCORS(req, res) {
   } else {
     res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGINS[0]);
   }
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-function cloverGet(path, callback) {
+// Supabase REST API helper
+function supabase(method, table, query, body, callback) {
+  const bodyStr = body ? JSON.stringify(body) : null;
+  const options = {
+    hostname: 'wntikhzvhybqhocqizuc.supabase.co',
+    path: `/rest/v1/${table}${query || ''}`,
+    method: method,
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'apikey': SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : 'return=representation'
+    }
+  };
+  if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+  const req = https.request(options, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try { callback(null, JSON.parse(data || '[]'), res.statusCode); }
+      catch(e) { callback(null, data, res.statusCode); }
+    });
+  });
+  req.on('error', callback);
+  if (bodyStr) req.write(bodyStr);
+  req.end();
+}
+
+// Clover helpers
+function cloverGet(apiPath, callback) {
   const options = {
     hostname: 'api.clover.com',
-    path: path,
+    path: apiPath,
     method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${CLOVER_TOKEN}`,
-      'Content-Type': 'application/json'
-    }
+    headers: { 'Authorization': `Bearer ${CLOVER_TOKEN}`, 'Content-Type': 'application/json' }
   };
   const req = https.request(options, (res) => {
     let data = '';
@@ -72,44 +102,41 @@ function cloverPost(cloverPath, body, callback) {
   req.end();
 }
 
-// Fetch ALL payments for a date using pagination
 function fetchAllPayments(startMs, endMs, callback) {
   let allPayments = [];
   let offset = 0;
-  const limit = 1000; // Clover max per page
-  const MAX_PAGES = 20; // safety limit - handles up to 20,000 payments
+  const limit = 1000;
+  const MAX_PAGES = 20;
   let page = 0;
-
   function fetchPage() {
     if (page >= MAX_PAGES) { callback(null, allPayments); return; }
     page++;
-
-    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?` +
-      `filter=createdTime>=${startMs}&filter=createdTime<=${endMs}` +
-      `&expand=tender&limit=${limit}&offset=${offset}`;
-
+    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=tender&limit=${limit}&offset=${offset}`;
     cloverGet(apiPath, (err, data, status) => {
       if (err) { callback(err, null); return; }
       const elements = data.elements || [];
       allPayments = allPayments.concat(elements);
-
-      // If we got a full page, there might be more
-      if (elements.length === limit) {
-        offset += limit;
-        fetchPage();
-      } else {
-        callback(null, allPayments);
-      }
+      if (elements.length === limit) { offset += limit; fetchPage(); }
+      else { callback(null, allPayments); }
     });
   }
   fetchPage();
+}
+
+function getBody(req, callback) {
+  let body = '';
+  req.on('data', chunk => body += chunk);
+  req.on('end', () => {
+    try { callback(null, JSON.parse(body || '{}')); }
+    catch(e) { callback(e, null); }
+  });
 }
 
 const server = http.createServer((req, res) => {
   const parsed = url.parse(req.url, true);
   const pathname = parsed.pathname;
 
-  // Serve the main app HTML
+  // Serve main app
   if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
     const filePath = path.join(__dirname, 'public', 'index.html');
     fs.readFile(filePath, (err, data) => {
@@ -121,133 +148,191 @@ const server = http.createServer((req, res) => {
   }
 
   setCORS(req, res);
-
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // Health check
+  const json = (data, status) => {
+    res.writeHead(status || 200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify(data));
+  };
+
+  // ---- HEALTH ----
   if (pathname === '/health') {
-    res.writeHead(200, {'Content-Type': 'application/json'});
-    res.end(JSON.stringify({status: 'ok', store: "Bailey's Market", time: new Date().toISOString()}));
+    json({status: 'ok', store: "Bailey's Market", time: new Date().toISOString()});
     return;
   }
 
-  // GET /api/summary?date=2026-04-09
+  // ---- CLOVER SUMMARY ----
   if (req.method === 'GET' && pathname === '/api/summary') {
     const date = parsed.query.date || new Date().toISOString().split('T')[0];
-
-    // Use EDT (UTC-4) for Maryland - covers full business day
-    // Go slightly wider: 3am UTC day before to 3am UTC next day (covers midnight-midnight ET)
     const [yyyy, mm, dd] = date.split('-').map(Number);
-    // Start: midnight Eastern = 04:00 UTC (EDT) or 05:00 UTC (EST)
-    // Use 04:00 UTC to cover EDT (April-November), which is what April uses
-    const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);  // midnight EDT
-    const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59); // 11:59pm EDT
-
+    const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
+    const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
     fetchAllPayments(startMs, endMs, (err, payments) => {
-      if (err) {
-        res.writeHead(500, {'Content-Type': 'application/json'});
-        res.end(JSON.stringify({error: err.message}));
-        return;
-      }
-
+      if (err) { json({error: err.message}, 500); return; }
       const successful = payments.filter(p => p.result === 'SUCCESS');
       let cash=0, credit=0, debit=0, ebt=0, tax=0, kitchen=0, total=0;
-
       successful.forEach(p => {
         const amt = (p.amount || 0) / 100;
         const taxAmt = (p.taxAmount || 0) / 100;
         const tender = (p.tender?.label || '').toLowerCase();
         const tenderKey = (p.tender?.labelKey || '').toLowerCase();
-
-        tax += taxAmt;
-        total += amt;
-
+        tax += taxAmt; total += amt;
         if (tenderKey.includes('cash') || tender.includes('cash')) cash += amt;
         else if (tenderKey.includes('debit') || tender.includes('debit')) debit += amt;
         else if (tenderKey.includes('credit') || tender.includes('credit')) credit += amt;
         else if (tenderKey.includes('ebt') || tender.includes('ebt') || tender.includes('food')) ebt += amt;
       });
-
-      res.writeHead(200, {'Content-Type': 'application/json'});
-      res.end(JSON.stringify({
-        date,
-        startMs, endMs,
-        cash: +cash.toFixed(2),
-        credit: +credit.toFixed(2),
-        debit: +debit.toFixed(2),
-        ebt: +ebt.toFixed(2),
-        tax: +tax.toFixed(2),
-        kitchen: +kitchen.toFixed(2),
-        netSales: +total.toFixed(2),
-        count: successful.length,
-        totalFetched: payments.length
-      }));
+      json({date, cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
+        ebt:+ebt.toFixed(2), tax:+tax.toFixed(2), kitchen:+kitchen.toFixed(2),
+        netSales:+total.toFixed(2), count: successful.length});
     });
     return;
   }
 
-
-  // DEBUG - returns raw Clover data for troubleshooting
-  if (req.method === 'GET' && pathname === '/api/debug') {
-    const date = parsed.query.date || '2026-04-09';
-    const [yyyy, mm, dd] = date.split('-').map(Number);
-    const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
-    const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
-    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=tender&limit=5`;
-    cloverGet(apiPath, (err, data, status) => {
-      res.writeHead(200, {'Content-Type': 'application/json'});
-      res.end(JSON.stringify({startMs, endMs, startDate: new Date(startMs).toISOString(), endDate: new Date(endMs).toISOString(), httpStatus: status, error: err?.message, data}, null, 2));
-    });
-    return;
-  }
-
-  // DEBUG - get most recent 5 payments regardless of date
-  if (req.method === 'GET' && pathname === '/api/debug-recent') {
-    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?expand=tender&limit=5&orderBy=createdTime&order=DESC`;
-    cloverGet(apiPath, (err, data, status) => {
-      res.writeHead(200, {'Content-Type': 'application/json'});
-      res.end(JSON.stringify({httpStatus: status, error: err?.message, data}, null, 2));
-    });
-    return;
-  }
-
-  // GET /api/items?q=milk
+  // ---- CLOVER ITEMS ----
   if (req.method === 'GET' && pathname === '/api/items') {
     const q = parsed.query.q || '';
-    const apiPath = `/v3/merchants/${MERCHANT_ID}/items?` +
-      `filter=name%20like%20%22%25${encodeURIComponent(q)}%25%22&limit=20`;
-    cloverGet(apiPath, (err, data, status) => {
-      if (err) { res.writeHead(500); res.end(JSON.stringify({error: err.message})); return; }
-      res.writeHead(status || 200, {'Content-Type': 'application/json'});
-      res.end(JSON.stringify(data));
+    cloverGet(`/v3/merchants/${MERCHANT_ID}/items?filter=name%20like%20%22%25${encodeURIComponent(q)}%25%22&limit=20`, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
     });
     return;
   }
 
-  // POST /api/items/:id/price
+  // ---- UPDATE PRICE ----
   if (req.method === 'POST' && pathname.match(/^\/api\/items\/[^/]+\/price$/)) {
     const itemId = pathname.split('/')[3];
-    let body = '';
-    req.on('data', chunk => body += chunk);
-    req.on('end', () => {
-      try {
-        const { price } = JSON.parse(body);
-        cloverPost(`/items/${itemId}`, { price: Math.round(price * 100) }, (err, data, status) => {
-          if (err) { res.writeHead(500); res.end(JSON.stringify({error: err.message})); return; }
-          res.writeHead(status || 200, {'Content-Type': 'application/json'});
-          res.end(JSON.stringify(data));
-        });
-      } catch(e) {
-        res.writeHead(400); res.end(JSON.stringify({error: 'Invalid body'}));
-      }
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      cloverPost(`/items/${itemId}`, {price: Math.round(body.price * 100)}, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
     });
     return;
   }
 
-  res.writeHead(404, {'Content-Type': 'application/json'});
-  res.end(JSON.stringify({error: 'Not found'}));
+  // ---- DAILY REPORTS ----
+  // GET /api/daily?month=2026-04  or  GET /api/daily/:date
+  if (req.method === 'GET' && pathname === '/api/daily') {
+    const month = parsed.query.month;
+    const date = parsed.query.date;
+    let query = '?store=eq.baileys&order=report_date.desc';
+    if (date) query = `?store=eq.baileys&report_date=eq.${date}`;
+    else if (month) query = `?store=eq.baileys&report_date=gte.${month}-01&report_date=lte.${month}-31&order=report_date.desc`;
+    supabase('GET', 'daily_reports', query, null, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  // POST /api/daily — save or update daily report
+  if (req.method === 'POST' && pathname === '/api/daily') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      // Upsert by report_date
+      supabase('POST', 'daily_reports', '?on_conflict=report_date', body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  // ---- MACHINE REPORTS ----
+  if (req.method === 'GET' && pathname === '/api/machines') {
+    const month = parsed.query.month;
+    let query = '?store=eq.baileys&order=report_date.desc';
+    if (month) query = `?store=eq.baileys&report_date=gte.${month}-01&report_date=lte.${month}-31&order=report_date.desc`;
+    supabase('GET', 'machine_reports', query, null, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/machines') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('POST', 'machine_reports', '?on_conflict=report_date', body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  // ---- INVOICES ----
+  if (req.method === 'GET' && pathname === '/api/invoices') {
+    const vendor = parsed.query.vendor;
+    const status = parsed.query.status;
+    let query = '?store=eq.baileys&order=created_at.desc';
+    if (vendor) query += `&vendor=ilike.*${vendor}*`;
+    if (status && status !== 'all') query += `&status=eq.${status}`;
+    supabase('GET', 'invoices', query, null, (err, data, status2) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status2);
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/invoices') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('POST', 'invoices', '', body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  if (req.method === 'PUT' && pathname.match(/^\/api\/invoices\/[^/]+$/)) {
+    const invId = pathname.split('/')[3];
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('PATCH', 'invoices', `?id=eq.${invId}`, body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  // ---- SPECIALTY CATEGORIES ----
+  if (req.method === 'GET' && pathname === '/api/categories') {
+    supabase('GET', 'specialty_categories', '?store=eq.baileys&active=eq.true&order=id', null, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/categories') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('POST', 'specialty_categories', '', {store: 'baileys', name: body.name}, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  if (req.method === 'DELETE' && pathname.match(/^\/api\/categories\/[^/]+$/)) {
+    const catId = pathname.split('/')[3];
+    supabase('PATCH', 'specialty_categories', `?id=eq.${catId}`, {active: false}, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  // 404
+  json({error: 'Not found'}, 404);
 });
 
 server.listen(PORT, () => {
-  console.log(`Bailey's Market API server running on port ${PORT}`);
+  console.log(`Bailey's Market server running on port ${PORT}`);
 });
