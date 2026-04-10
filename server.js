@@ -123,7 +123,7 @@ function fetchOrderCategories(startMs, endMs, callback) {
     page++;
     const apiPath = `/v3/merchants/${MERCHANT_ID}/orders?` +
       `filter=createdTime>=${startMs}&filter=createdTime<=${endMs}` +
-      `&expand=lineItems.elements.item.itemGroup&limit=${limit}&offset=${offset}`;
+      `&expand=lineItems&limit=${limit}&offset=${offset}`;
     cloverGet(apiPath, (err, data) => {
       if (err) { callback(err, null); return; }
       const elements = data.elements || [];
@@ -141,26 +141,134 @@ function aggregateCategories(orders) {
     if (order.state === 'OPEN' || !order.lineItems) return;
     (order.lineItems.elements || []).forEach(item => {
       if (item.refunded) return;
-      // Try multiple paths for category name
-      const catName = item.item?.itemGroup?.name
-        || item.itemGroup?.name
-        || (item.item?.categories?.elements?.[0]?.name)
-        || 'Uncategorized';
-      // Use item price * qty, subtract discounts
-      const unitPrice = (item.price || item.item?.price || 0) / 100;
-      const qty = item.quantity || 1;
-      const discount = (item.discountAmount || 0) / 100;
-      const netAmt = (unitPrice * qty) - discount;
-      if (netAmt <= 0) return;
+      const catName = item.itemGroup?.name || 'Uncategorized';
+      const netAmt = ((item.price || 0) * (item.quantity || 1) - (item.discountAmount || 0)) / 100;
       if (!cats[catName]) cats[catName] = { name: catName, netSales: 0, qty: 0 };
       cats[catName].netSales += netAmt;
-      cats[catName].qty += qty;
+      cats[catName].qty += (item.quantity || 1);
     });
   });
   return Object.values(cats)
     .filter(c => c.netSales > 0)
     .sort((a, b) => b.netSales - a.netSales)
-    .map(c => ({ ...c, netSales: +c.netSales.toFixed(2), qty: +c.qty.toFixed(2) }));
+    .map(c => ({ ...c, netSales: +c.netSales.toFixed(2) }));
+}
+
+
+
+function fetchCategoryMap(callback) {
+  let allCats = [];
+  let offset = 0;
+  const limit = 200;
+  function fetchPage() {
+    cloverGet(`/v3/merchants/${MERCHANT_ID}/categories?expand=items&limit=${limit}&offset=${offset}`, (err, data) => {
+      if (err) { callback(err, null); return; }
+      const elements = data.elements || [];
+      allCats = allCats.concat(elements);
+      if (elements.length === limit) { offset += limit; fetchPage(); }
+      else {
+        const map = {};
+        allCats.forEach(cat => {
+          (cat.items?.elements||[]).forEach(item => { if(!map[item.id]) map[item.id] = cat.name; });
+        });
+        callback(null, map);
+      }
+    });
+  }
+  fetchPage();
+}
+
+function fetchOrderCategories(startMs, endMs, callback) {
+  let allOrders = [];
+  let offset = 0;
+  const limit = 500;
+  let page = 0;
+  function fetchPage() {
+    if(page >= 10) { callback(null, allOrders); return; }
+    page++;
+    cloverGet(`/v3/merchants/${MERCHANT_ID}/orders?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=lineItems&limit=${limit}&offset=${offset}`, (err, data) => {
+      if(err) { callback(err, null); return; }
+      const elements = data.elements || [];
+      allOrders = allOrders.concat(elements);
+      if(elements.length === limit) { offset += limit; fetchPage(); }
+      else { callback(null, allOrders); }
+    });
+  }
+  fetchPage();
+}
+
+function aggregateCategories(orders, catMap) {
+  const cats = {};
+  orders.forEach(order => {
+    if(order.state === 'OPEN' || !order.lineItems) return;
+    (order.lineItems.elements||[]).forEach(item => {
+      if(item.refunded || item.exchanged) return;
+      const itemId = item.item?.id || '';
+      const catName = (itemId && catMap[itemId]) ? catMap[itemId] : 'Uncategorized';
+      const netAmt = ((item.price||0)/100 * (item.quantity||1)) - ((item.discountAmount||0)/100);
+      if(netAmt <= 0) return;
+      if(!cats[catName]) cats[catName] = {name:catName, netSales:0, qty:0};
+      cats[catName].netSales += netAmt;
+      cats[catName].qty += (item.quantity||1);
+    });
+  });
+  return Object.values(cats)
+    .filter(c => c.netSales > 0)
+    .sort((a,b) => b.netSales - a.netSales)
+    .map(c => ({...c, netSales:+c.netSales.toFixed(2), qty:+c.qty.toFixed(2)}));
+}
+
+function buildSummaryResponse(date, startMs, endMs, done) {
+  const KITCHEN_ID = 'cc044434-defb-0585-8547-a52227f9f17c';
+  // Step 1: fetch payments
+  fetchAllPayments(startMs, endMs, (err, payments) => {
+    if (err) { done(err, null); return; }
+    const pmnts = payments.filter(p => p.result === 'SUCCESS');
+    let cash=0, credit=0, debit=0, ebt=0, tax=0, total=0;
+    let kCash=0, kCredit=0, kDebit=0, kEbt=0, kTax=0, kTotal=0;
+    pmnts.forEach(p => {
+      const amt = (p.amount||0)/100;
+      const refunded = (p.refunds?.elements||[]).reduce((s,r)=>(s+(r.amount||0)/100),0);
+      const netAmt = amt - refunded;
+      const taxAmt = (p.taxAmount||0)/100;
+      const tender = (p.tender?.label||'').toLowerCase();
+      const tKey = (p.tender?.labelKey||'').toLowerCase();
+      tax += Math.round(taxAmt*100); total += netAmt;
+      if(tKey.includes('cash')||tender.includes('cash')) cash += netAmt;
+      else if(tKey.includes('debit')||tender.includes('debit')) debit += netAmt;
+      else if(tKey.includes('credit')||tender.includes('credit')) credit += netAmt;
+      else if(tKey.includes('ebt')||tender.includes('ebt')) ebt += netAmt;
+      if(p.device?.id === KITCHEN_ID) {
+        kTax += Math.round(taxAmt*100); kTotal += netAmt;
+        if(tKey.includes('cash')||tender.includes('cash')) kCash += netAmt;
+        else if(tKey.includes('debit')||tender.includes('debit')) kDebit += netAmt;
+        else if(tKey.includes('credit')||tender.includes('credit')) kCredit += netAmt;
+        else if(tKey.includes('ebt')||tender.includes('ebt')) kEbt += netAmt;
+      }
+    });
+    const taxAmt = +(tax/100).toFixed(2);
+    const kTaxAmt = +(kTax/100).toFixed(2);
+    // Step 2: fetch category map
+    fetchCategoryMap((mapErr, catMap) => {
+      const cMap = mapErr ? {} : (catMap||{});
+      // Step 3: fetch orders for category breakdown
+      fetchOrderCategories(startMs, endMs, (catErr, orders) => {
+        const categories = catErr ? [] : aggregateCategories(orders||[], cMap);
+        done(null, {
+          date, count: pmnts.length,
+          cash:+cash.toFixed(2), credit:+credit.toFixed(2),
+          debit:+debit.toFixed(2), ebt:+ebt.toFixed(2),
+          tax: taxAmt, netSales: +(total - taxAmt).toFixed(2), grossSales: +total.toFixed(2),
+          kitchen:{
+            cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2),
+            debit:+kDebit.toFixed(2), ebt:+kEbt.toFixed(2),
+            tax: kTaxAmt, total:+kTotal.toFixed(2), netSales:+(kTotal-kTaxAmt).toFixed(2)
+          },
+          categories: categories
+        });
+      });
+    });
+  });
 }
 
 function fetchAllPayments(startMs, endMs, callback) {
@@ -236,65 +344,12 @@ const server = http.createServer((req, res) => {
     const [yyyy, mm, dd] = date.split('-').map(Number);
     const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
     const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
-    fetchDevices((devErr, devList) => {
-      // Known device IDs for Bailey's Market
-      const KITCHEN_ID = 'cc044434-defb-0585-8547-a52227f9f17c';
-      const kitchenDev = (devList||[]).find(d => d.id === KITCHEN_ID || (d.name||'').toLowerCase() === 'kitchen');
-      const kitchenId = kitchenDev ? kitchenDev.id : KITCHEN_ID;
-      console.log('Kitchen ID:', kitchenId);
-      fetchAllPayments(startMs, endMs, (err, payments) => {
-        if (err) { json({error: err.message}, 500); return; }
-        const pmnts = payments.filter(p => p.result === 'SUCCESS');
-        let cash=0, credit=0, debit=0, ebt=0, tax=0, total=0;
-        let kCash=0, kCredit=0, kDebit=0, kEbt=0, kTax=0, kTotal=0;
-        pmnts.forEach(p => {
-          // Use netAmount if available, otherwise amount
-          // Refunded payments: amount is positive but refundedAmount exists
-          // Refund records: result=REFUND, amount is negative
-          const amt = (p.amount||0)/100;
-          const refunded = (p.refunds?.elements||[]).reduce((s,r)=>(s+(r.amount||0)/100),0);
-          const netAmt = amt - refunded; // subtract any refunds on this payment
-          const taxAmt = (p.taxAmount||0)/100;
-          const tender = (p.tender?.label||'').toLowerCase();
-          const tKey = (p.tender?.labelKey||'').toLowerCase();
-          tax += Math.round(taxAmt * 100); total += netAmt;
-          if(tKey.includes('cash')||tender.includes('cash')) cash += netAmt;
-          else if(tKey.includes('debit')||tender.includes('debit')) debit += netAmt;
-          else if(tKey.includes('credit')||tender.includes('credit')) credit += netAmt;
-          else if(tKey.includes('ebt')||tender.includes('ebt')) ebt += netAmt;
-          const dId = p.device?.id || '';
-          if(kitchenId && dId === kitchenId) {
-            kTax += Math.round(taxAmt * 100); kTotal += netAmt;
-            if(tKey.includes('cash')||tender.includes('cash')) kCash += netAmt;
-            else if(tKey.includes('debit')||tender.includes('debit')) kDebit += netAmt;
-            else if(tKey.includes('credit')||tender.includes('credit')) kCredit += netAmt;
-            else if(tKey.includes('ebt')||tender.includes('ebt')) kEbt += netAmt;
-          }
-        });
-        // Fetch category breakdown in parallel
-        fetchOrderCategories(startMs, endMs, (catErr, orders) => {
-          const categories = catErr ? [] : aggregateCategories(orders || []);
-          const netSales = +(total - tax/100).toFixed(2);
-          const kNetSales = +(kTotal - kTax/100).toFixed(2);
-          json({
-            date, count: pmnts.length, kitchenDeviceFound: !!kitchenId,
-            cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
-            ebt:+ebt.toFixed(2), tax:+(tax/100).toFixed(2),
-            netSales: netSales,
-            grossSales: +total.toFixed(2),
-            kitchen:{
-              cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2), debit:+kDebit.toFixed(2),
-              ebt:+kEbt.toFixed(2), tax:+(kTax/100).toFixed(2),
-              total:+kTotal.toFixed(2), netSales: kNetSales
-            },
-            categories: categories
-          });
-        });
-      });
+    buildSummaryResponse(date, startMs, endMs, (err, result) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(result);
     });
     return;
   }
-
 
   // ---- CLOVER ITEMS ----
   if (req.method === 'GET' && pathname === '/api/items') {
