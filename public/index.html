@@ -279,7 +279,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           </div>
           <div class="divider"></div>
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Net Sales (excl. tax)</span>
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Net Sales</span>
             <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-sales">$0.00</span>
           </div>
         </div>
@@ -304,7 +304,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           </div>
           <div class="divider"></div>
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Kitchen Total</span>
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Kitchen Net Sales</span>
             <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-kitchen">$0.00</span>
           </div>
         </div>
@@ -902,14 +902,16 @@ async function savePrice(id, name) {
 function fmtMoney(v) { return '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function getVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 function calcSales() {
-  const t = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
-  document.getElementById('total-sales').textContent = fmtMoney(t);
-  document.getElementById('badge-sales').textContent = fmtMoney(t);
+  const gross = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
+  const net = gross - getVal('s-tax');
+  document.getElementById('total-sales').textContent = fmtMoney(net);
+  document.getElementById('badge-sales').textContent = fmtMoney(net);
 }
 function calcKitchen() {
-  const t = getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt');
-  document.getElementById('total-kitchen').textContent = fmtMoney(t);
-  document.getElementById('badge-kitchen').textContent = fmtMoney(t);
+  const gross = getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt');
+  const net = gross - getVal('k-tax');
+  document.getElementById('total-kitchen').textContent = fmtMoney(net);
+  document.getElementById('badge-kitchen').textContent = fmtMoney(net);
 }
 function calcPayouts() {
   const cashRows = [...document.querySelectorAll('.payout-amt')];
