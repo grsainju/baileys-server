@@ -310,6 +310,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
       </div>
 
+      <!-- CATEGORY SALES -->
+      <div class="card" id="category-sales-card" style="display:none">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#eaf0fb">📊</div>
+          <div class="card-title">Sales by Category</div>
+          <div class="card-badge tag tag-blue" id="badge-categories">—</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body" id="category-sales-body">
+          <div class="empty-state"><div>📊</div>Pull from Clover to see category breakdown</div>
+        </div>
+      </div>
+
       <!-- PAYOUTS -->
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
@@ -821,7 +834,12 @@ async function parseCloverCSV() {
       if(d.kitchen.tax)    document.getElementById('k-tax').value    = d.kitchen.tax.toFixed(2);
       calcKitchen();
     }
-    status.textContent = `✓ ${d.count} payments pulled — Net ${fmtMoney(d.netSales)}`;
+    // Category breakdown
+    if(d.categories && d.categories.length) {
+      window._pulledCategories = d.categories;
+      renderCategorySection(d.categories, d.netSales);
+    }
+    status.textContent = `✓ ${d.count} payments pulled — Net Sales ${fmtMoney(d.netSales)}`;
     status.className = 'clover-status clover-ok';
     status.style.display = 'inline-block';
     showToast('Clover data loaded — ' + d.count + ' payments');
@@ -901,6 +919,40 @@ async function savePrice(id, name) {
 // ---- CALCULATIONS ----
 function fmtMoney(v) { return '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function getVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+
+function renderCategorySection(cats, totalNet) {
+  const card = document.getElementById('category-sales-card');
+  const body = document.getElementById('category-sales-body');
+  const badge = document.getElementById('badge-categories');
+  card.style.display = 'block';
+  badge.textContent = cats.length + ' categories';
+  const maxSale = Math.max(...cats.map(c => c.netSales));
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:2fr 1fr 60px;gap:6px;padding:0 0 8px;border-bottom:0.5px solid var(--border);margin-bottom:8px">
+      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Category</span>
+      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">Net Sales</span>
+      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">% Share</span>
+    </div>
+    ${cats.map(c => {
+      const pct = totalNet > 0 ? (c.netSales/totalNet*100).toFixed(1) : 0;
+      const barW = maxSale > 0 ? Math.round(c.netSales/maxSale*100) : 0;
+      return `<div style="margin-bottom:10px">
+        <div style="display:grid;grid-template-columns:2fr 1fr 60px;gap:6px;margin-bottom:4px;align-items:center">
+          <span style="font-size:13px;font-weight:500">${c.name}</span>
+          <span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--green)">${fmtMoney(c.netSales)}</span>
+          <span style="font-size:12px;text-align:right;color:var(--muted)">${pct}%</span>
+        </div>
+        <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
+          <div style="width:${barW}%;height:100%;background:var(--green);border-radius:2px"></div>
+        </div>
+      </div>`;
+    }).join('')}
+    <div style="padding-top:8px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between">
+      <span style="font-size:12px;color:var(--muted)">Total Net Sales</span>
+      <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">${fmtMoney(totalNet)}</span>
+    </div>`;
+}
+
 function calcSales() {
   const gross = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
   const net = gross - getVal('s-tax');
