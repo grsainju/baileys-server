@@ -109,6 +109,51 @@ function fetchDevices(callback) {
   });
 }
 
+
+// Fetch category sales from orders for a date range
+function fetchOrderCategories(startMs, endMs, callback) {
+  let allOrders = [];
+  let offset = 0;
+  const limit = 500;
+  const MAX_PAGES = 10;
+  let page = 0;
+
+  function fetchPage() {
+    if (page >= MAX_PAGES) { callback(null, allOrders); return; }
+    page++;
+    const apiPath = `/v3/merchants/${MERCHANT_ID}/orders?` +
+      `filter=createdTime>=${startMs}&filter=createdTime<=${endMs}` +
+      `&expand=lineItems&limit=${limit}&offset=${offset}`;
+    cloverGet(apiPath, (err, data) => {
+      if (err) { callback(err, null); return; }
+      const elements = data.elements || [];
+      allOrders = allOrders.concat(elements);
+      if (elements.length === limit) { offset += limit; fetchPage(); }
+      else { callback(null, allOrders); }
+    });
+  }
+  fetchPage();
+}
+
+function aggregateCategories(orders) {
+  const cats = {};
+  orders.forEach(order => {
+    if (order.state === 'OPEN' || !order.lineItems) return;
+    (order.lineItems.elements || []).forEach(item => {
+      if (item.refunded) return;
+      const catName = item.itemGroup?.name || 'Uncategorized';
+      const netAmt = ((item.price || 0) * (item.quantity || 1) - (item.discountAmount || 0)) / 100;
+      if (!cats[catName]) cats[catName] = { name: catName, netSales: 0, qty: 0 };
+      cats[catName].netSales += netAmt;
+      cats[catName].qty += (item.quantity || 1);
+    });
+  });
+  return Object.values(cats)
+    .filter(c => c.netSales > 0)
+    .sort((a, b) => b.netSales - a.netSales)
+    .map(c => ({ ...c, netSales: +c.netSales.toFixed(2) }));
+}
+
 function fetchAllPayments(startMs, endMs, callback) {
   let allPayments = [];
   let offset = 0;
@@ -118,7 +163,7 @@ function fetchAllPayments(startMs, endMs, callback) {
   function fetchPage() {
     if (page >= MAX_PAGES) { callback(null, allPayments); return; }
     page++;
-    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=tender,device&limit=${limit}&offset=${offset}`;
+    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=tender,device,refunds&limit=${limit}&offset=${offset}`;
     cloverGet(apiPath, (err, data, status) => {
       if (err) { callback(err, null); return; }
       const elements = data.elements || [];
@@ -190,34 +235,51 @@ const server = http.createServer((req, res) => {
       console.log('Kitchen ID:', kitchenId);
       fetchAllPayments(startMs, endMs, (err, payments) => {
         if (err) { json({error: err.message}, 500); return; }
-        const pmnts = payments.filter(p => p.result === 'SUCCESS' || p.result === 'REFUND');
+        const pmnts = payments.filter(p => p.result === 'SUCCESS');
         let cash=0, credit=0, debit=0, ebt=0, tax=0, total=0;
         let kCash=0, kCredit=0, kDebit=0, kEbt=0, kTax=0, kTotal=0;
         pmnts.forEach(p => {
+          // Use netAmount if available, otherwise amount
+          // Refunded payments: amount is positive but refundedAmount exists
+          // Refund records: result=REFUND, amount is negative
           const amt = (p.amount||0)/100;
+          const refunded = (p.refunds?.elements||[]).reduce((s,r)=>(s+(r.amount||0)/100),0);
+          const netAmt = amt - refunded; // subtract any refunds on this payment
           const taxAmt = (p.taxAmount||0)/100;
           const tender = (p.tender?.label||'').toLowerCase();
           const tKey = (p.tender?.labelKey||'').toLowerCase();
-          tax += taxAmt; total += amt;
-          if(tKey.includes('cash')||tender.includes('cash')) cash += amt;
-          else if(tKey.includes('debit')||tender.includes('debit')) debit += amt;
-          else if(tKey.includes('credit')||tender.includes('credit')) credit += amt;
-          else if(tKey.includes('ebt')||tender.includes('ebt')) ebt += amt;
+          tax += taxAmt; total += netAmt;
+          if(tKey.includes('cash')||tender.includes('cash')) cash += netAmt;
+          else if(tKey.includes('debit')||tender.includes('debit')) debit += netAmt;
+          else if(tKey.includes('credit')||tender.includes('credit')) credit += netAmt;
+          else if(tKey.includes('ebt')||tender.includes('ebt')) ebt += netAmt;
           const dId = p.device?.id || '';
           if(kitchenId && dId === kitchenId) {
-            kTax += taxAmt; kTotal += amt;
-            if(tKey.includes('cash')||tender.includes('cash')) kCash += amt;
-            else if(tKey.includes('debit')||tender.includes('debit')) kDebit += amt;
-            else if(tKey.includes('credit')||tender.includes('credit')) kCredit += amt;
-            else if(tKey.includes('ebt')||tender.includes('ebt')) kEbt += amt;
+            kTax += taxAmt; kTotal += netAmt;
+            if(tKey.includes('cash')||tender.includes('cash')) kCash += netAmt;
+            else if(tKey.includes('debit')||tender.includes('debit')) kDebit += netAmt;
+            else if(tKey.includes('credit')||tender.includes('credit')) kCredit += netAmt;
+            else if(tKey.includes('ebt')||tender.includes('ebt')) kEbt += netAmt;
           }
         });
-        json({
-          date, count: pmnts.length, kitchenDeviceFound: !!kitchenId,
-          cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
-          ebt:+ebt.toFixed(2), tax:+tax.toFixed(2), netSales:+total.toFixed(2),
-          kitchen:{cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2), debit:+kDebit.toFixed(2),
-            ebt:+kEbt.toFixed(2), tax:+kTax.toFixed(2), total:+kTotal.toFixed(2)}
+        // Fetch category breakdown in parallel
+        fetchOrderCategories(startMs, endMs, (catErr, orders) => {
+          const categories = catErr ? [] : aggregateCategories(orders || []);
+          const netSales = +(total - tax).toFixed(2);
+          const kNetSales = +(kTotal - kTax).toFixed(2);
+          json({
+            date, count: pmnts.length, kitchenDeviceFound: !!kitchenId,
+            cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
+            ebt:+ebt.toFixed(2), tax:+tax.toFixed(2),
+            netSales: netSales,
+            grossSales: +total.toFixed(2),
+            kitchen:{
+              cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2), debit:+kDebit.toFixed(2),
+              ebt:+kEbt.toFixed(2), tax:+kTax.toFixed(2),
+              total:+kTotal.toFixed(2), netSales: kNetSales
+            },
+            categories: categories
+          });
         });
       });
     });
