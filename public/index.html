@@ -568,11 +568,15 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div style="font-size:13px;color:#6b6860;margin-bottom:18px" id="pay-modal-vendor"></div>
     <input type="hidden" id="pay-modal-id">
     <div style="font-size:11px;font-weight:600;color:#6b6860;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px">Payment Method</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
       <button onclick="selectPayType('cash')" class="paytype-btn" data-type="cash">💵 Cash</button>
       <button onclick="selectPayType('check')" class="paytype-btn" data-type="check">📝 Check</button>
       <button onclick="selectPayType('credit')" class="paytype-btn" data-type="credit">💳 Credit Card</button>
       <button onclick="selectPayType('ach')" class="paytype-btn" data-type="ach">🏦 ACH</button>
+    </div>
+    <div id="check-number-row" style="display:none;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:600;color:#6b6860;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px">Check Number</div>
+      <input type="text" id="check-number" placeholder="e.g. 1042" style="width:100%;font-family:inherit;font-size:14px;padding:9px 10px;border:0.5px solid #ccc9be;border-radius:7px;outline:none">
     </div>
     <select id="pay-modal-type" style="display:none"></select>
     <div style="display:flex;gap:8px">
@@ -907,6 +911,50 @@ function addInvoice() {
   renderInvoices();
   showToast('Invoice added');
 }
+
+function toggleSelectAll(cb) {
+  document.querySelectorAll('.inv-cb').forEach(c => { c.checked = cb.checked; });
+  updateBulkBar();
+}
+function updateBulkBar() {
+  const checked = [...document.querySelectorAll('.inv-cb:checked')];
+  const bar = document.getElementById('bulk-pay-bar');
+  if(!bar) return;
+  if(checked.length > 0) {
+    bar.style.display = 'flex';
+    const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
+    document.getElementById('bulk-selected-label').textContent = checked.length + ' invoice' + (checked.length>1?'s':'') + ' selected';
+    document.getElementById('bulk-selected-total').textContent = fmtMoney(total);
+  } else {
+    bar.style.display = 'none';
+  }
+  // uncheck select-all if not all checked
+  const all = document.querySelectorAll('.inv-cb');
+  const selectAll = document.getElementById('select-all-cb');
+  if(selectAll) selectAll.checked = all.length > 0 && checked.length === all.length;
+}
+function clearSelection() {
+  document.querySelectorAll('.inv-cb').forEach(c => c.checked = false);
+  const selectAll = document.getElementById('select-all-cb');
+  if(selectAll) selectAll.checked = false;
+  updateBulkBar();
+}
+function bulkMarkPaid() {
+  const checked = [...document.querySelectorAll('.inv-cb:checked')];
+  if(!checked.length) return;
+  const ids = checked.map(c => c.dataset.id);
+  // Open modal in bulk mode
+  const modal = document.getElementById('pay-modal');
+  const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
+  document.getElementById('pay-modal-vendor').textContent = ids.length + ' invoices — Total ' + fmtMoney(total);
+  document.getElementById('pay-modal-id').value = ids.join(',');
+  document.getElementById('pay-modal-type').value = '';
+  document.querySelectorAll('.paytype-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('check-number-row').style.display = 'none';
+  document.getElementById('check-number').value = '';
+  modal.style.display = 'flex';
+}
+
 function markPaid(id) {
   const inv = invoices.find(i => i.id===id);
   if(!inv) return;
@@ -922,18 +970,33 @@ function selectPayType(type) {
   document.querySelectorAll('.paytype-btn').forEach(b => b.classList.remove('selected'));
   document.querySelector(`.paytype-btn[data-type="${type}"]`).classList.add('selected');
   document.getElementById('pay-modal-type').value = type;
+  // Show check number field only for check payments
+  const checkRow = document.getElementById('check-number-row');
+  checkRow.style.display = type === 'check' ? 'block' : 'none';
+  if(type !== 'check') document.getElementById('check-number').value = '';
 }
 function confirmMarkPaid() {
-  const id = document.getElementById('pay-modal-id').value;
+  const idField = document.getElementById('pay-modal-id').value;
   const paytype = document.getElementById('pay-modal-type').value;
   if(!paytype) { showToast('Select a payment method'); return; }
-  const inv = invoices.find(i => i.id===id);
-  if(!inv) return;
-  inv.status='paid'; inv.paytype=paytype; inv.paidDate=new Date().toISOString().split('T')[0];
+  const checkNum = document.getElementById('check-number').value.trim();
+  if(paytype === 'check' && !checkNum) { showToast('Enter the check number'); document.getElementById('check-number').focus(); return; }
+  // Support single or bulk (comma-separated ids)
+  const ids = idField.split(',').map(s => s.trim()).filter(Boolean);
+  const paidDate = new Date().toISOString().split('T')[0];
+  ids.forEach(id => {
+    const inv = invoices.find(i => i.id===id);
+    if(!inv) return;
+    inv.status='paid'; inv.paytype=paytype; inv.paidDate=paidDate;
+    if(paytype === 'check') inv.checkNumber = checkNum;
+  });
   localStorage.setItem('bm_invoices', JSON.stringify(invoices));
   document.getElementById('pay-modal').style.display = 'none';
+  document.getElementById('check-number-row').style.display = 'none';
+  document.getElementById('check-number').value = '';
   renderInvoices();
-  showToast('Invoice marked as paid');
+  const count = ids.length;
+  showToast(count > 1 ? count + ' invoices marked as paid' : 'Invoice marked as paid');
 }
 function closePayModal() {
   document.getElementById('pay-modal').style.display = 'none';
@@ -942,22 +1005,51 @@ function renderInvoices() {
   const unpaid = invoices.filter(i => i.status==='unpaid');
   const unpaidTotal = unpaid.reduce((s,i) => s+i.amount, 0);
   document.getElementById('badge-unpaid').textContent = `${unpaid.length} — ${fmtMoney(unpaidTotal)}`;
-  const renderList = (list, container) => {
-    if(!list.length) { document.getElementById(container).innerHTML = '<div class="empty-state"><div>📄</div>None</div>'; return; }
-    document.getElementById(container).innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th></th></tr></thead><tbody>${
-      list.map(inv => `<tr>
+  // Render unpaid with checkboxes for bulk payment
+  const unpaidContainer = document.getElementById('unpaid-list');
+  if(!unpaid.length) {
+    unpaidContainer.innerHTML = '<div class="empty-state"><div>📄</div>No unpaid invoices</div>';
+  } else {
+    unpaidContainer.innerHTML = `
+      <div id="bulk-pay-bar" style="display:none;background:var(--green-l);border:0.5px solid var(--green-m);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:500;color:var(--green)" id="bulk-selected-label">0 invoices selected</span>
+        <span style="font-size:13px;font-family:var(--mono);color:var(--green)" id="bulk-selected-total">$0.00</span>
+        <button onclick="bulkMarkPaid()" style="margin-left:auto;background:var(--green);color:white;border:none;padding:7px 16px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Pay Selected</button>
+        <button onclick="clearSelection()" style="background:none;border:0.5px solid var(--border2);padding:7px 12px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer">Clear</button>
+      </div>
+      <table class="inv-table"><thead><tr>
+        <th style="width:32px"><input type="checkbox" id="select-all-cb" onclick="toggleSelectAll(this)"></th>
+        <th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Pay Type</th><th></th>
+      </tr></thead><tbody>${
+        unpaid.map(inv => `<tr>
+          <td><input type="checkbox" class="inv-cb" data-id="${inv.id}" data-amount="${inv.amount}" onchange="updateBulkBar()"></td>
+          <td>${inv.date}</td>
+          <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
+          <td>${inv.vendor}</td>
+          <td class="num">${fmtMoney(inv.amount)}</td>
+          <td>—</td>
+          <td><button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button></td>
+        </tr>`).join('')
+      }</tbody></table>`;
+  }
+
+  // Render all invoices (read only)
+  const allContainer = document.getElementById('all-invoices-list');
+  if(!invoices.length) {
+    allContainer.innerHTML = '<div class="empty-state"><div>📋</div>No invoices yet</div>';
+  } else {
+    allContainer.innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th>Paid Date</th></tr></thead><tbody>${
+      invoices.map(inv => `<tr>
         <td>${inv.date}</td>
         <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
         <td>${inv.vendor}</td>
         <td class="num">${fmtMoney(inv.amount)}</td>
         <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
-        <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}</span>` : '—'}</td>
-        <td>${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button>` : `<span style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</span>`}</td>
+        <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
+        <td style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</td>
       </tr>`).join('')
     }</tbody></table>`;
-  };
-  renderList(unpaid, 'unpaid-list');
-  renderList(invoices, 'all-invoices-list');
+  }
   updateDashboard();
 }
 
