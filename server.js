@@ -1,6 +1,8 @@
 const https = require('https');
 const http = require('http');
 const url = require('url');
+const fs = require('fs');
+const path = require('path');
 
 const CLOVER_TOKEN = 'cea0b142-7593-6c1e-5e79-f1ae5ddbd603';
 const MERCHANT_ID = '536927510109317';
@@ -23,10 +25,10 @@ function setCORS(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-function cloverRequest(method, path, body, callback) {
+function cloverRequest(method, cloverPath, body, callback) {
   const options = {
     hostname: 'api.clover.com',
-    path: `/v3/merchants/${MERCHANT_ID}${path}`,
+    path: `/v3/merchants/${MERCHANT_ID}${cloverPath}`,
     method: method,
     headers: {
       'Authorization': `Bearer ${CLOVER_TOKEN}`,
@@ -47,6 +49,24 @@ function cloverRequest(method, path, body, callback) {
 }
 
 const server = http.createServer((req, res) => {
+  const parsed = url.parse(req.url, true);
+  const pathname = parsed.pathname;
+
+  // Serve the main app HTML
+  if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+    const filePath = path.join(__dirname, 'public', 'index.html');
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404);
+        res.end('App not found');
+        return;
+      }
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.end(data);
+    });
+    return;
+  }
+
   setCORS(req, res);
 
   if (req.method === 'OPTIONS') {
@@ -54,9 +74,6 @@ const server = http.createServer((req, res) => {
     res.end();
     return;
   }
-
-  const parsed = url.parse(req.url, true);
-  const pathname = parsed.pathname;
 
   if (pathname === '/health') {
     res.writeHead(200, {'Content-Type': 'application/json'});
