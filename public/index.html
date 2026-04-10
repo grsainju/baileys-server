@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bailey's Market — Operations</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --green:#1a5c3a;--green-d:#134530;--green-l:#e8f4ed;--green-m:#b8dfc8;
+  --amber:#c8780a;--amber-l:#fef3e2;
+  --red:#b83232;--red-l:#fdeaea;
+  --blue:#1a4a8a;--blue-l:#eaf0fb;
+  --bg:#f5f4f0;--surface:#ffffff;--surface2:#fafaf7;
+  --border:#e2e0d8;--border2:#ccc9be;
+  --text:#1c1b18;--muted:#6b6860;--hint:#9b9890;
+  --font:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace;
+  --r:10px;--r2:7px
+}
+
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:15px}
+
+/* AUTH */
+#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--green);padding:20px}
+.auth-box{background:white;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center}
+.auth-logo{width:56px;height:56px;background:var(--green);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px}
+.auth-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:6px}
+.auth-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
+.auth-options{display:flex;flex-direction:column;gap:10px}
+.auth-btn{padding:12px;border-radius:8px;border:1.5px solid var(--border2);font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.15s}
+.auth-btn.owner{background:var(--green);color:white;border-color:var(--green)}
+.auth-btn.owner:hover{background:var(--green-d)}
+.auth-btn.staff{background:white;color:var(--text)}
+.auth-btn.staff:hover{background:var(--surface2)}
+.auth-hint{font-size:12px;color:var(--hint);margin-top:16px}
+
+/* LAYOUT */
+#app{display:none;flex-direction:column;min-height:100vh}
+.topbar{background:var(--green);height:54px;display:flex;align-items:center;padding:0 16px;gap:12px;position:sticky;top:0;z-index:200}
+.topbar-brand{color:white;font-weight:600;font-size:15px;margin-right:8px}
+.topbar-brand em{font-style:normal;opacity:0.55;font-weight:400;font-size:13px;margin-left:4px}
+.nav-scroll{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+.nav-scroll::-webkit-scrollbar{display:none}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,0.6);padding:6px 11px;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:13px;white-space:nowrap;transition:all 0.15s;font-weight:400}
+.nav-btn:hover{color:white;background:rgba(255,255,255,0.1)}
+.nav-btn.active{color:white;background:rgba(255,255,255,0.18);font-weight:500}
+.nav-btn.owner-only{color:rgba(255,220,100,0.7)}
+.nav-btn.owner-only.active{color:#ffd864;background:rgba(255,216,100,0.15)}
+.topbar-user{margin-left:auto;color:rgba(255,255,255,0.5);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:5px;white-space:nowrap}
+.topbar-user:hover{color:white;background:rgba(255,255,255,0.1)}
+
+.content{flex:1;padding:18px 16px;max-width:860px;margin:0 auto;width:100%}
+.page{display:none}.page.active{display:block}
+
+/* PAGE HEADER */
+.page-header{margin-bottom:18px}
+.page-title{font-size:20px;font-weight:600}
+.page-sub{font-size:13px;color:var(--muted);margin-top:3px}
+
+/* CARDS */
+.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.card-head{padding:11px 15px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:9px;background:var(--surface2);cursor:pointer;user-select:none}
+.card-head:hover{background:#f3f2ee}
+.card-icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.card-title{font-size:13px;font-weight:600;flex:1;letter-spacing:0.1px}
+.card-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500}
+.card-chevron{color:var(--hint);font-size:11px;transition:transform 0.2s}
+.card-chevron.open{transform:rotate(180deg)}
+.card-body{padding:15px;display:none}
+.card-body.open{display:block}
+
+/* DATE BAR */
+.date-bar{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:12px 15px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.date-bar label{font-size:12px;color:var(--muted);font-weight:500}
+.date-bar input{font-family:var(--font);font-size:14px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:6px;color:var(--text);background:white;outline:none}
+.date-bar input:focus{border-color:var(--green)}
+.clover-btn{margin-left:auto;background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:6px 13px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:6px}
+.clover-btn:hover{background:var(--green-m)}
+.clover-btn.loading{opacity:0.6;cursor:wait}
+
+/* FORM */
+.form-grid{display:grid;gap:10px;margin-bottom:12px}
+.fg-2{grid-template-columns:1fr 1fr}
+.fg-3{grid-template-columns:1fr 1fr 1fr}
+.fg-4{grid-template-columns:1fr 1fr 1fr 1fr}
+.fgroup{display:flex;flex-direction:column;gap:4px}
+.fgroup label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.3px;text-transform:uppercase}
+.fgroup input,.fgroup select{font-family:var(--font);font-size:14px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:var(--r2);background:white;color:var(--text);outline:none;width:100%;transition:border-color 0.15s}
+.fgroup input:focus,.fgroup select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(26,92,58,0.08)}
+.fgroup input[type=number]{font-family:var(--mono);text-align:right}
+.dollar{position:relative}
+.dollar::before{content:'$';position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--hint);font-size:13px;font-family:var(--mono);z-index:1}
+.dollar input{padding-left:22px}
+.divider{height:0.5px;background:var(--border);margin:14px 0}
+
+/* MACHINE GRID */
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mcard{border:0.5px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2)}
+.mcard-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:9px}
+.mcard-inputs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.mcard-net{margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.mcard-net span{font-size:11px;color:var(--muted)}
+.mcard-net strong{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--green)}
+.machine-total{background:var(--green-l);border:0.5px solid var(--green-m);border-radius:8px;padding:12px 15px;margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.mt-item{text-align:center}
+.mt-label{font-size:11px;color:var(--muted);margin-bottom:3px}
+.mt-val{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--green)}
+
+/* INVOICE TABLE */
+.inv-table{width:100%;border-collapse:collapse;font-size:13px}
+.inv-table th{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface2)}
+.inv-table td{padding:8px 8px;border-bottom:0.5px solid var(--border);vertical-align:middle}
+.inv-table tr:last-child td{border-bottom:none}
+.inv-table tr:hover td{background:var(--surface2)}
+.inv-table input,.inv-table select{font-family:var(--font);font-size:13px;padding:5px 7px;border:0.5px solid var(--border2);border-radius:5px;background:white;width:100%;outline:none}
+.inv-table input:focus,.inv-table select:focus{border-color:var(--green)}
+.status-badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
+.badge-paid{background:#e8f4ed;color:#1a5c3a}
+.badge-unpaid{background:#fef3e2;color:#c8780a}
+.badge-partial{background:#eaf0fb;color:#1a4a8a}
+.add-row-btn{background:none;border:0.5px dashed var(--border2);color:var(--muted);padding:7px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer;width:100%;margin-top:8px;transition:all 0.15s}
+.add-row-btn:hover{border-color:var(--green);color:var(--green);background:var(--green-l)}
+
+/* SUBMIT */
+.submit-bar{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.submit-btn{background:var(--green);color:white;border:none;padding:10px 24px;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s}
+.submit-btn:hover{background:var(--green-d)}
+.submit-btn:active{transform:scale(0.98)}
+.save-note{font-size:12px;color:var(--muted)}
+.save-success{color:var(--green);font-size:13px;font-weight:500;display:none}
+
+/* DASHBOARD */
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.dash-grid.four{grid-template-columns:1fr 1fr 1fr 1fr}
+.metric{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px}
+.metric-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px}
+.metric-val{font-size:26px;font-weight:600;font-family:var(--mono);color:var(--text);line-height:1}
+.metric-val.green{color:var(--green)}
+.metric-val.amber{color:var(--amber)}
+.metric-sub{font-size:11px;color:var(--hint);margin-top:5px}
+.chart-bar-wrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-bottom:12px}
+.chart-title{font-size:13px;font-weight:600;margin-bottom:14px}
+.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bar-label{font-size:12px;color:var(--muted);width:80px;flex-shrink:0}
+.bar-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width 0.5s ease}
+.bar-val{font-family:var(--mono);font-size:12px;color:var(--text);width:72px;text-align:right;flex-shrink:0}
+
+/* WEEKLY REPORT */
+.report-table{width:100%;border-collapse:collapse;font-size:13px}
+.report-table th{background:var(--green);color:white;padding:9px 12px;font-size:12px;font-weight:500;text-align:left}
+.report-table td{padding:9px 12px;border-bottom:0.5px solid var(--border)}
+.report-table tr:last-child td{border-bottom:none;font-weight:600;background:var(--green-l)}
+.report-table tr:hover:not(:last-child) td{background:var(--surface2)}
+.num{font-family:var(--mono);text-align:right}
+
+/* PRICE MANAGER */
+.search-bar{display:flex;gap:8px;margin-bottom:14px}
+.search-bar input{flex:1;font-family:var(--font);font-size:14px;padding:9px 12px;border:0.5px solid var(--border2);border-radius:8px;background:white;outline:none}
+.search-bar input:focus{border-color:var(--green)}
+.search-bar button{background:var(--green);color:white;border:none;padding:9px 18px;border-radius:8px;font-family:var(--font);font-size:14px;cursor:pointer}
+.item-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:0.5px solid var(--border);transition:background 0.1s}
+.item-row:hover{background:var(--surface2)}
+.item-name{flex:1;font-size:14px}
+.item-sku{font-size:11px;color:var(--hint);font-family:var(--mono)}
+.item-price{font-family:var(--mono);font-size:14px;width:90px;text-align:right}
+.item-price input{font-family:var(--mono);font-size:14px;padding:5px 8px;border:0.5px solid var(--border2);border-radius:5px;width:90px;text-align:right;outline:none}
+.item-price input:focus{border-color:var(--green)}
+.item-save{background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:5px 12px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;font-family:var(--font)}
+.item-save:hover{background:var(--green-m)}
+.item-saved{color:var(--green);font-size:12px;font-weight:500}
+
+/* HISTORY */
+.history-item{padding:12px 15px;border-bottom:0.5px solid var(--border);display:flex;align-items:flex-start;gap:12px}
+.history-item:last-child{border-bottom:none}
+.history-date{font-size:12px;color:var(--muted);font-family:var(--mono);width:80px;flex-shrink:0;padding-top:2px}
+.history-content{flex:1}
+.history-title{font-size:13px;font-weight:500;margin-bottom:3px}
+.history-detail{font-size:12px;color:var(--muted)}
+.history-amt{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--green)}
+
+/* CATEGORY TRACKER */
+.cat-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)}
+.cat-row:last-child{border-bottom:none}
+.cat-name{font-size:13px;font-weight:500}
+.cat-actual{font-family:var(--mono);font-size:13px;color:var(--green)}
+.cat-proj{font-family:var(--mono);font-size:13px;color:var(--amber)}
+.cat-trend{font-size:11px;color:var(--muted)}
+
+/* UTIL */
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.tag-green{background:var(--green-l);color:var(--green)}
+.tag-amber{background:var(--amber-l);color:var(--amber)}
+.tag-red{background:var(--red-l);color:var(--red)}
+.tag-blue{background:var(--blue-l);color:var(--blue)}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:white;padding:12px 18px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none;box-shadow:0 4px 16px rgba(0,0,0,0.15)}
+.toast.show{display:block;animation:toastin 0.2s ease}
+@keyframes toastin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
+.empty-state div{font-size:28px;margin-bottom:8px}
+.section-note{font-size:12px;color:var(--hint);margin-top:4px}
+.clover-status{font-size:12px;padding:4px 10px;border-radius:20px;font-weight:500}
+.clover-ok{background:var(--green-l);color:var(--green)}
+.clover-err{background:var(--red-l);color:var(--red)}
+
+@media(max-width:600px){
+  .fg-2,.fg-3,.fg-4{grid-template-columns:1fr 1fr}
+  .fg-4{grid-template-columns:1fr 1fr}
+  .dash-grid.four{grid-template-columns:1fr 1fr}
+  .mgrid{grid-template-columns:1fr 1fr}
+  .machine-total{grid-template-columns:1fr 1fr 1fr}
+}
+@media(max-width:400px){
+  .fg-3,.fg-4,.mgrid{grid-template-columns:1fr}
+  .machine-total{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- AUTH -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">🏪</div>
+    <div class="auth-title">Bailey's Market</div>
+    <div class="auth-sub">Operations & Reporting System</div>
+    <div class="auth-options">
+      <button class="auth-btn owner" onclick="login('owner')">Owner / Manager Login</button>
+      <button class="auth-btn staff" onclick="login('staff')">Staff Daily Entry</button>
+    </div>
+    <div class="auth-hint">Select your role to continue</div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-brand">Bailey's Market <em>Operations</em></div>
+    <div class="nav-scroll" id="nav-tabs"></div>
+    <div class="topbar-user" onclick="logout()">🔓 Sign out</div>
+  </div>
+  <div class="content">
+    <!-- DAILY REPORT PAGE -->
+    <div class="page active" id="page-daily">
+      <div class="page-header">
+        <div class="page-title">Daily Report</div>
+        <div class="page-sub">Enter today's sales, payouts, and cash activity</div>
+      </div>
+
+      <div class="date-bar">
+        <label>Report Date</label>
+        <input type="date" id="report-date">
+        <div class="clover-btn" onclick="parseCloverCSV()" id="clover-pull-btn">
+          <span>↓</span> Pull from Clover
+        </div>
+        <span id="clover-status" class="clover-status" style="display:none"></span>
+      </div>
+
+      <!-- SALES -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#e8f4ed">💰</div>
+          <div class="card-title">Sales (from Clover POS)</div>
+          <div class="card-badge tag tag-green" id="badge-sales">$0.00</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open">
+          <div class="form-grid fg-3">
+            <div class="fgroup"><label>Cash Sales</label><div class="dollar"><input type="number" id="s-cash" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
+            <div class="fgroup"><label>Credit Card</label><div class="dollar"><input type="number" id="s-credit" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
+            <div class="fgroup"><label>Debit Card</label><div class="dollar"><input type="number" id="s-debit" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
+            <div class="fgroup"><label>EBT / Food Stamp</label><div class="dollar"><input type="number" id="s-ebt" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
+            <div class="fgroup"><label>Tax Collected</label><div class="dollar"><input type="number" id="s-tax" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
+            <div class="fgroup"><label>Kitchen Sales</label><div class="dollar"><input type="number" id="s-kitchen" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Total Sales</span>
+            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-sales">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PAYOUTS -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#fef3e2">📤</div>
+          <div class="card-title">Payouts & Cash Out</div>
+          <div class="card-badge tag tag-amber" id="badge-payouts">$0.00</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body">
+          <div class="form-grid fg-3">
+            <div class="fgroup"><label>Cash Payout</label><div class="dollar"><input type="number" id="p-cash" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>Lottery Payout</label><div class="dollar"><input type="number" id="p-lottery" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="p-game" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>Lottery Refund</label><div class="dollar"><input type="number" id="p-lotref" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="p-atm" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>Missing / Extra</label><div class="dollar"><input type="number" id="p-misc" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Total Payouts</span>
+            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--amber)" id="total-payouts">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- MONEY TRANSFER -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#eaf0fb">💸</div>
+          <div class="card-title">Money Transfer Services</div>
+          <div class="card-badge tag tag-blue" id="badge-transfer">$0.00</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body">
+          <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">Moneygram</div>
+          <div class="form-grid fg-2">
+            <div class="fgroup"><label>Daily Transactions ($)</label><div class="dollar"><input type="number" id="mg-txn" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
+            <div class="fgroup"><label>Daily Deposit ($)</label><div class="dollar"><input type="number" id="mg-dep" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
+          </div>
+          <div class="divider"></div>
+          <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">BOSS Revolution</div>
+          <div class="form-grid fg-2">
+            <div class="fgroup"><label>Daily Transactions ($)</label><div class="dollar"><input type="number" id="br-txn" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
+            <div class="fgroup"><label>Daily Deposit ($)</label><div class="dollar"><input type="number" id="br-dep" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Combined Deposits</span>
+            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--blue)" id="total-transfer">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CASH DEPOSIT -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#e8f4ed">🏦</div>
+          <div class="card-title">Cash Collected / Bank Deposit</div>
+          <div class="card-badge tag tag-green" id="badge-deposit">$0.00</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body">
+          <div class="form-grid fg-3">
+            <div class="fgroup"><label>POS Cash</label><div class="dollar"><input type="number" id="d-pos" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
+            <div class="fgroup"><label>Lottery Kiosk Cash</label><div class="dollar"><input type="number" id="d-lottery" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
+            <div class="fgroup"><label>Toy Machine Commission</label><div class="dollar"><input type="number" id="d-toy" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
+            <div class="fgroup"><label>Coin Game Commission</label><div class="dollar"><input type="number" id="d-coin" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
+            <div class="fgroup"><label>Other Cash</label><div class="dollar"><input type="number" id="d-other" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Total Deposit</span>
+            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-deposit">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- SPECIALTY CATEGORIES -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#fef3e2">🥐</div>
+          <div class="card-title">Specialty Categories</div>
+          <div class="card-badge tag tag-amber" id="badge-specialty">$0.00</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body" id="specialty-body">
+          <div id="specialty-rows"></div>
+          <button class="add-row-btn" onclick="addSpecialtyRow()">+ Add Category</button>
+        </div>
+      </div>
+
+      <!-- NOTES -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#f1efea">📝</div>
+          <div class="card-title">Notes</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body">
+          <textarea id="daily-notes" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border:0.5px solid var(--border2);border-radius:7px;resize:vertical;outline:none" placeholder="Any notes for today..."></textarea>
+        </div>
+      </div>
+
+      <div class="submit-bar">
+        <button class="submit-btn" onclick="submitDailyReport()">Save Daily Report</button>
+        <span class="save-note">All fields are optional — save what you have</span>
+        <span class="save-success" id="daily-saved">✓ Saved successfully</span>
+      </div>
+    </div>
+
+    <!-- GAME MACHINES PAGE -->
+    <div class="page" id="page-machines">
+      <div class="page-header">
+        <div class="page-title">Game Machines</div>
+        <div class="page-sub">Enter Total In / Total Out from each machine's printed report</div>
+      </div>
+      <div class="date-bar">
+        <label>Report Date</label>
+        <input type="date" id="machine-date">
+      </div>
+      <div class="mgrid" id="machine-grid"></div>
+      <div class="machine-total" id="machine-total" style="margin-top:12px">
+        <div class="mt-item"><div class="mt-label">Total Net</div><div class="mt-val" id="mt-net">$0.00</div></div>
+        <div class="mt-item"><div class="mt-label">Vendor (40%)</div><div class="mt-val" id="mt-vendor">$0.00</div></div>
+        <div class="mt-item"><div class="mt-label">Our Income (60%)</div><div class="mt-val" id="mt-store">$0.00</div></div>
+      </div>
+      <div class="submit-bar" style="margin-top:12px">
+        <button class="submit-btn" onclick="saveMachines()">Save Machine Report</button>
+        <span class="save-success" id="machine-saved">✓ Saved</span>
+      </div>
+    </div>
+
+    <!-- INVOICES PAGE -->
+    <div class="page" id="page-invoices">
+      <div class="page-header">
+        <div class="page-title">Invoice Tracker</div>
+        <div class="page-sub">Enter invoices when received. Update payment status when paid.</div>
+      </div>
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#eaf0fb">➕</div>
+          <div class="card-title">Add New Invoice</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open">
+          <div class="form-grid fg-3">
+            <div class="fgroup"><label>Receipt Date</label><input type="date" id="inv-date"></div>
+            <div class="fgroup"><label>Invoice Number</label><input type="text" id="inv-num" placeholder="e.g. INV-12345"></div>
+            <div class="fgroup"><label>Vendor Name</label><input type="text" id="inv-vendor" placeholder="Vendor name" list="vendor-list"><datalist id="vendor-list"></datalist></div>
+            <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" id="inv-amount" step="0.01" placeholder="0.00"></div></div>
+            <div class="fgroup"><label>Status</label>
+              <select id="inv-status">
+                <option value="unpaid">Unpaid (received, not paid)</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+            <div class="fgroup"><label>Pay Type</label>
+              <select id="inv-paytype">
+                <option value="">— leave blank if unpaid —</option>
+                <option value="cash">Cash</option>
+                <option value="credit">Credit Card</option>
+                <option value="check">Check</option>
+                <option value="ach">ACH</option>
+              </select>
+            </div>
+          </div>
+          <div class="fgroup"><label>Notes</label><input type="text" id="inv-notes" placeholder="Optional notes"></div>
+          <div style="margin-top:12px"><button class="submit-btn" onclick="addInvoice()">Add Invoice</button></div>
+        </div>
+      </div>
+
+      <!-- UNPAID -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#fef3e2">⏳</div>
+          <div class="card-title">Unpaid Invoices</div>
+          <div class="card-badge tag tag-amber" id="badge-unpaid">0</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open" id="unpaid-list">
+          <div class="empty-state"><div>📄</div>No unpaid invoices</div>
+        </div>
+      </div>
+
+      <!-- ALL INVOICES -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#e8f4ed">📋</div>
+          <div class="card-title">All Invoices</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body" id="all-invoices-list">
+          <div class="empty-state"><div>📋</div>No invoices yet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD PAGE (OWNER) -->
+    <div class="page" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">Dashboard</div>
+        <div class="page-sub" id="dash-sub">Month to date — Bailey's Market</div>
+      </div>
+      <div class="dash-grid four">
+        <div class="metric"><div class="metric-label">Net Sales MTD</div><div class="metric-val green" id="d-sales-mtd">$0</div><div class="metric-sub" id="d-sales-days">0 days recorded</div></div>
+        <div class="metric"><div class="metric-label">Net Purchases MTD</div><div class="metric-val amber" id="d-purch-mtd">$0</div><div class="metric-sub">From invoices</div></div>
+        <div class="metric"><div class="metric-label">Est. Month Sales</div><div class="metric-val" id="d-sales-est">$0</div><div class="metric-sub">Based on daily avg</div></div>
+        <div class="metric"><div class="metric-label">Est. Month Purchases</div><div class="metric-val" id="d-purch-est">$0</div><div class="metric-sub">Based on daily avg</div></div>
+      </div>
+      <div class="dash-grid">
+        <div class="metric"><div class="metric-label">Profit Margin</div><div class="metric-val green" id="d-margin">—</div><div class="metric-sub">Sales minus purchases</div></div>
+        <div class="metric"><div class="metric-label">Avg Daily Sale</div><div class="metric-val" id="d-avg-sale">$0</div><div class="metric-sub">This month</div></div>
+        <div class="metric"><div class="metric-label">Machine Income MTD</div><div class="metric-val green" id="d-machine-inc">$0</div><div class="metric-sub">60% of net</div></div>
+        <div class="metric"><div class="metric-label">Unpaid Invoices</div><div class="metric-val amber" id="d-unpaid-amt">$0</div><div class="metric-sub" id="d-unpaid-count">0 invoices</div></div>
+      </div>
+
+      <!-- SPECIALTY PROJECTIONS -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#fef3e2">📈</div>
+          <div class="card-title">Category Projections</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open" id="cat-proj-body">
+          <div class="empty-state"><div>📊</div>Enter specialty category data in Daily Report to see projections</div>
+        </div>
+      </div>
+
+      <!-- SALES BAR -->
+      <div class="chart-bar-wrap">
+        <div class="chart-title">This Week — Daily Sales</div>
+        <div id="weekly-bars"><div class="empty-state" style="padding:20px">No data yet</div></div>
+      </div>
+    </div>
+
+    <!-- WEEKLY REPORT (OWNER) -->
+    <div class="page" id="page-reports">
+      <div class="page-header">
+        <div class="page-title">Weekly Reports</div>
+        <div class="page-sub">Sales vs. purchases comparison by week</div>
+      </div>
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#e8f4ed">📊</div>
+          <div class="card-title">Sales vs. Purchases</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open" id="weekly-report-body">
+          <div class="empty-state"><div>📊</div>Enter daily reports to generate weekly comparison</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRICE MANAGER (OWNER) -->
+    <div class="page" id="page-prices">
+      <div class="page-header">
+        <div class="page-title">Price & Inventory Manager</div>
+        <div class="page-sub">Search items and update prices directly in Clover</div>
+      </div>
+      <div class="search-bar">
+        <input type="text" id="item-search" placeholder="Search by item name or SKU..." onkeydown="if(event.key==='Enter')searchItems()">
+        <button onclick="searchItems()">Search</button>
+      </div>
+      <div class="card" id="item-results-card" style="display:none">
+        <div class="card-body open" style="padding:0" id="item-results"></div>
+      </div>
+      <div id="price-note" style="font-size:13px;color:var(--muted);text-align:center;padding:30px">
+        Search for an item above to view and update its price in Clover
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const CLOVER_TOKEN = 'cea0b142-7593-6c1e-5e79-f1ae5ddbd603';
+const MERCHANT_ID = '536927510109317';
+const API_BASE = window.location.origin + '/api';
+
+let userRole = null;
+let dailyReports = JSON.parse(localStorage.getItem('bm_daily') || '[]');
+let invoices = JSON.parse(localStorage.getItem('bm_invoices') || '[]');
+let machineReports = JSON.parse(localStorage.getItem('bm_machines') || '[]');
+let specialtyCategories = JSON.parse(localStorage.getItem('bm_specialty_cats') || '["Fresh Bakery"]');
+
+const STAFF_TABS = [
+  {id:'daily', label:'Daily Report'},
+  {id:'machines', label:'Game Machines'},
+  {id:'invoices', label:'Invoices'},
+];
+const OWNER_TABS = [
+  {id:'daily', label:'Daily Report'},
+  {id:'machines', label:'Game Machines'},
+  {id:'invoices', label:'Invoices'},
+  {id:'dashboard', label:'Dashboard', owner:true},
+  {id:'reports', label:'Weekly Reports', owner:true},
+  {id:'prices', label:'Price Manager', owner:true},
+];
+
+function login(role) {
+  userRole = role;
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  buildNav();
+  init();
+}
+function logout() {
+  userRole = null;
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+function buildNav() {
+  const tabs = userRole === 'owner' ? OWNER_TABS : STAFF_TABS;
+  const nav = document.getElementById('nav-tabs');
+  nav.innerHTML = tabs.map(t =>
+    `<button class="nav-btn${t.owner?' owner-only':''}" onclick="showPage('${t.id}',this)">${t.label}</button>`
+  ).join('');
+  nav.querySelector('.nav-btn').classList.add('active');
+}
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(id==='dashboard') updateDashboard();
+  if(id==='reports') updateWeeklyReport();
+  if(id==='invoices') renderInvoices();
+}
+function toggleCard(head) {
+  const body = head.nextElementSibling;
+  const chev = head.querySelector('.card-chevron');
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
+}
+function init() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('report-date').value = today;
+  document.getElementById('machine-date').value = today;
+  document.getElementById('inv-date').value = today;
+  buildMachineGrid();
+  buildSpecialtyRows();
+  renderInvoices();
+  updateDashboard();
+  loadVendorList();
+}
+
+// ---- CLOVER DIRECT PULL ----
+async function parseCloverCSV() {
+  const btn = document.getElementById('clover-pull-btn');
+  const status = document.getElementById('clover-status');
+  const date = document.getElementById('report-date').value;
+  if(!date) { showToast('Select a date first'); return; }
+  btn.innerHTML = '<span>⟳</span> Pulling...';
+  btn.style.opacity = '0.7';
+  status.style.display = 'none';
+  try {
+    const res = await fetch(`${API_BASE}/summary?date=${date}`);
+    if(!res.ok) throw new Error('Server error ' + res.status);
+    const d = await res.json();
+    if(d.error) throw new Error(d.error);
+    if(d.cash   !== undefined) document.getElementById('s-cash').value   = d.cash.toFixed(2);
+    if(d.credit !== undefined) document.getElementById('s-credit').value = d.credit.toFixed(2);
+    if(d.debit  !== undefined) document.getElementById('s-debit').value  = d.debit.toFixed(2);
+    if(d.ebt    !== undefined) document.getElementById('s-ebt').value    = d.ebt.toFixed(2);
+    if(d.tax    !== undefined) document.getElementById('s-tax').value    = d.tax.toFixed(2);
+    if(d.kitchen !== undefined && d.kitchen > 0) document.getElementById('s-kitchen').value = d.kitchen.toFixed(2);
+    calcSales();
+    status.textContent = `✓ ${d.count} payments pulled — Net ${fmtMoney(d.netSales)}`;
+    status.className = 'clover-status clover-ok';
+    status.style.display = 'inline-block';
+    showToast('Clover data loaded — ' + d.count + ' payments');
+  } catch(e) {
+    status.textContent = '✗ Could not connect';
+    status.className = 'clover-status clover-err';
+    status.style.display = 'inline-block';
+    showToast('Pull failed: ' + e.message);
+  }
+  btn.innerHTML = '<span>↓</span> Pull from Clover';
+  btn.style.opacity = '1';
+}
+
+function parseMoney(str) {
+  if(!str) return 0;
+  const n = parseFloat(str.replace(/[$,\s]/g,''));
+  return isNaN(n) ? 0 : Math.abs(n);
+}
+
+// ---- PRICE MANAGER (via proxy server) ----
+async function searchItems() {
+  const q = document.getElementById('item-search').value.trim();
+  if(!q) return;
+  const note = document.getElementById('price-note');
+  note.style.display = 'block';
+  note.textContent = 'Searching Clover...';
+  document.getElementById('item-results-card').style.display = 'none';
+  try {
+    const res = await fetch(`${API_BASE}/items?q=${encodeURIComponent(q)}`);
+    if(!res.ok) throw new Error();
+    const data = await res.json();
+    const items = data.elements || [];
+    if(!items.length) { note.textContent = 'No items found. Try a different search term.'; return; }
+    note.style.display = 'none';
+    document.getElementById('item-results-card').style.display = 'block';
+    document.getElementById('item-results').innerHTML = items.map(item => `
+      <div class="item-row" id="row-${item.id}">
+        <div style="flex:1">
+          <div class="item-name">${item.name}</div>
+          <div class="item-sku">${item.sku || item.id.slice(0,8)}</div>
+        </div>
+        <div class="item-price">
+          <input type="number" step="0.01" value="${((item.price||0)/100).toFixed(2)}" id="price-${item.id}" onchange="markChanged('${item.id}')">
+        </div>
+        <button class="item-save" id="save-${item.id}" onclick="savePrice('${item.id}','${item.name}')">Save</button>
+      </div>
+    `).join('');
+  } catch(e) {
+    note.textContent = 'Search failed. Check connection and try again.';
+    note.style.display = 'block';
+  }
+}
+function markChanged(id) {
+  const btn = document.getElementById('save-'+id);
+  btn.style.background='var(--amber-l)'; btn.style.color='var(--amber)'; btn.textContent='Save';
+}
+async function savePrice(id, name) {
+  const input = document.getElementById('price-'+id);
+  const newPrice = parseFloat(input.value);
+  const btn = document.getElementById('save-'+id);
+  btn.textContent='Saving...'; btn.disabled=true;
+  try {
+    const res = await fetch(`${API_BASE}/items/${id}/price`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({price: newPrice})
+    });
+    if(!res.ok) throw new Error();
+    btn.textContent='✓ Saved'; btn.style.background='var(--green-l)'; btn.style.color='var(--green)';
+    showToast('Price updated: '+name);
+  } catch(e) {
+    btn.textContent='Failed'; btn.style.background='var(--red-l)'; btn.style.color='var(--red)';
+    showToast('Save failed — try again');
+  }
+  btn.disabled=false;
+}
+
+// ---- CALCULATIONS ----
+function fmtMoney(v) { return '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function getVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
+function calcSales() {
+  const t = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
+  document.getElementById('total-sales').textContent = fmtMoney(t);
+  document.getElementById('badge-sales').textContent = fmtMoney(t);
+}
+function calcPayouts() {
+  const t = getVal('p-cash')+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
+  document.getElementById('total-payouts').textContent = fmtMoney(t);
+  document.getElementById('badge-payouts').textContent = fmtMoney(t);
+}
+function calcTransfer() {
+  const t = getVal('mg-dep')+getVal('br-dep');
+  document.getElementById('total-transfer').textContent = fmtMoney(t);
+  document.getElementById('badge-transfer').textContent = fmtMoney(t);
+}
+function calcDeposit() {
+  const t = getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other');
+  document.getElementById('total-deposit').textContent = fmtMoney(t);
+  document.getElementById('badge-deposit').textContent = fmtMoney(t);
+}
+
+// ---- SPECIALTY ----
+function buildSpecialtyRows() {
+  const container = document.getElementById('specialty-rows');
+  container.innerHTML = specialtyCategories.map((cat,i) => `
+    <div class="form-grid fg-2" style="margin-bottom:8px" id="scat-${i}">
+      <div class="fgroup">
+        <label>${cat}</label>
+        <div class="dollar"><input type="number" id="sc-${i}" step="0.01" placeholder="0.00" oninput="calcSpecialty()"></div>
+      </div>
+      <div class="fgroup" style="justify-content:flex-end;padding-top:18px">
+        <button onclick="removeSpecialtyCat(${i})" style="background:none;border:none;color:var(--hint);cursor:pointer;font-size:13px">✕ Remove</button>
+      </div>
+    </div>
+  `).join('');
+  calcSpecialty();
+}
+function addSpecialtyRow() {
+  const name = prompt('Category name (e.g. Fresh Bakery):');
+  if(!name) return;
+  specialtyCategories.push(name);
+  localStorage.setItem('bm_specialty_cats', JSON.stringify(specialtyCategories));
+  buildSpecialtyRows();
+}
+function removeSpecialtyCat(i) {
+  specialtyCategories.splice(i,1);
+  localStorage.setItem('bm_specialty_cats', JSON.stringify(specialtyCategories));
+  buildSpecialtyRows();
+}
+function calcSpecialty() {
+  let t=0;
+  specialtyCategories.forEach((_,i) => t += getVal('sc-'+i));
+  document.getElementById('badge-specialty').textContent = fmtMoney(t);
+}
+
+// ---- MACHINES ----
+function buildMachineGrid() {
+  const grid = document.getElementById('machine-grid');
+  grid.innerHTML = Array.from({length:8}, (_,i) => `
+    <div class="mcard">
+      <div class="mcard-label">Machine ${i+1}</div>
+      <div class="mcard-inputs">
+        <div class="fgroup"><label>Total In</label><div class="dollar"><input type="number" step="0.01" placeholder="0.00" id="m${i}-in" oninput="calcMachines()"></div></div>
+        <div class="fgroup"><label>Total Out</label><div class="dollar"><input type="number" step="0.01" placeholder="0.00" id="m${i}-out" oninput="calcMachines()"></div></div>
+      </div>
+      <div class="mcard-net">
+        <span>Net</span>
+        <strong id="m${i}-net">$0.00</strong>
+      </div>
+    </div>
+  `).join('');
+}
+function calcMachines() {
+  let totalNet = 0;
+  for(let i=0;i<8;i++) {
+    const net = getVal('m'+i+'-in') - getVal('m'+i+'-out');
+    document.getElementById('m'+i+'-net').textContent = fmtMoney(net);
+    totalNet += net;
+  }
+  document.getElementById('mt-net').textContent = fmtMoney(totalNet);
+  document.getElementById('mt-vendor').textContent = fmtMoney(totalNet * 0.4);
+  document.getElementById('mt-store').textContent = fmtMoney(totalNet * 0.6);
+}
+function saveMachines() {
+  const date = document.getElementById('machine-date').value;
+  const machines = Array.from({length:8}, (_,i) => ({
+    in: getVal('m'+i+'-in'), out: getVal('m'+i+'-out'), net: getVal('m'+i+'-in')-getVal('m'+i+'-out')
+  }));
+  const totalNet = machines.reduce((s,m) => s+m.net, 0);
+  const rec = { date, machines, totalNet, vendorPay: totalNet*0.4, storeIncome: totalNet*0.6, ts: Date.now() };
+  const idx = machineReports.findIndex(r => r.date === date);
+  if(idx>=0) machineReports[idx]=rec; else machineReports.push(rec);
+  localStorage.setItem('bm_machines', JSON.stringify(machineReports));
+  document.getElementById('machine-saved').style.display = 'inline';
+  setTimeout(() => document.getElementById('machine-saved').style.display='none', 3000);
+  showToast('Machine report saved');
+}
+
+// ---- DAILY REPORT SAVE ----
+function submitDailyReport() {
+  const date = document.getElementById('report-date').value;
+  const specialty = specialtyCategories.map((name,i) => ({name, amount: getVal('sc-'+i)}));
+  const rec = {
+    date,
+    sales: {cash:getVal('s-cash'), credit:getVal('s-credit'), debit:getVal('s-debit'), ebt:getVal('s-ebt'), tax:getVal('s-tax'), kitchen:getVal('s-kitchen'), total: getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt')},
+    payouts: {cash:getVal('p-cash'), lottery:getVal('p-lottery'), game:getVal('p-game'), lotteryRefund:getVal('p-lotref'), atm:getVal('p-atm'), misc:getVal('p-misc'), total: getVal('p-cash')+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc')},
+    transfer: {mgTxn:getVal('mg-txn'), mgDep:getVal('mg-dep'), brTxn:getVal('br-txn'), brDep:getVal('br-dep')},
+    deposit: {pos:getVal('d-pos'), lottery:getVal('d-lottery'), toy:getVal('d-toy'), coin:getVal('d-coin'), other:getVal('d-other'), total: getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other')},
+    specialty, notes: document.getElementById('daily-notes').value, ts: Date.now()
+  };
+  const idx = dailyReports.findIndex(r => r.date === date);
+  if(idx>=0) dailyReports[idx]=rec; else dailyReports.push(rec);
+  localStorage.setItem('bm_daily', JSON.stringify(dailyReports));
+  document.getElementById('daily-saved').style.display = 'inline';
+  setTimeout(() => document.getElementById('daily-saved').style.display='none', 3000);
+  showToast('Daily report saved');
+}
+
+// ---- INVOICES ----
+function loadVendorList() {
+  const vendors = ['Mi Mexico','EMD','Costco','Restaurant Depot','Sysco','US Foods','Pepsi','Coca-Cola','Modelo','Performance Food Group'];
+  const dl = document.getElementById('vendor-list');
+  dl.innerHTML = vendors.map(v => `<option value="${v}">`).join('');
+}
+function addInvoice() {
+  const inv = {
+    id: Date.now().toString(),
+    date: document.getElementById('inv-date').value,
+    num: document.getElementById('inv-num').value,
+    vendor: document.getElementById('inv-vendor').value,
+    amount: parseFloat(document.getElementById('inv-amount').value) || 0,
+    status: document.getElementById('inv-status').value,
+    paytype: document.getElementById('inv-paytype').value,
+    notes: document.getElementById('inv-notes').value
+  };
+  if(!inv.vendor || !inv.amount) { showToast('Enter vendor and amount'); return; }
+  invoices.unshift(inv);
+  localStorage.setItem('bm_invoices', JSON.stringify(invoices));
+  document.getElementById('inv-num').value='';
+  document.getElementById('inv-vendor').value='';
+  document.getElementById('inv-amount').value='';
+  document.getElementById('inv-notes').value='';
+  document.getElementById('inv-status').value='unpaid';
+  document.getElementById('inv-paytype').value='';
+  renderInvoices();
+  showToast('Invoice added');
+}
+function markPaid(id) {
+  const inv = invoices.find(i => i.id===id);
+  if(!inv) return;
+  const paytype = prompt('Payment method:', 'cash');
+  if(!paytype) return;
+  inv.status='paid'; inv.paytype=paytype; inv.paidDate=new Date().toISOString().split('T')[0];
+  localStorage.setItem('bm_invoices', JSON.stringify(invoices));
+  renderInvoices();
+  showToast('Invoice marked as paid');
+}
+function renderInvoices() {
+  const unpaid = invoices.filter(i => i.status==='unpaid');
+  const unpaidTotal = unpaid.reduce((s,i) => s+i.amount, 0);
+  document.getElementById('badge-unpaid').textContent = `${unpaid.length} — ${fmtMoney(unpaidTotal)}`;
+  const renderList = (list, container) => {
+    if(!list.length) { document.getElementById(container).innerHTML = '<div class="empty-state"><div>📄</div>None</div>'; return; }
+    document.getElementById(container).innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th></th></tr></thead><tbody>${
+      list.map(inv => `<tr>
+        <td>${inv.date}</td>
+        <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
+        <td>${inv.vendor}</td>
+        <td class="num">${fmtMoney(inv.amount)}</td>
+        <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
+        <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}</span>` : '—'}</td>
+        <td>${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button>` : `<span style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</span>`}</td>
+      </tr>`).join('')
+    }</tbody></table>`;
+  };
+  renderList(unpaid, 'unpaid-list');
+  renderList(invoices, 'all-invoices-list');
+  updateDashboard();
+}
+
+// ---- DASHBOARD ----
+function updateDashboard() {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const monthReports = dailyReports.filter(r => r.date && r.date.startsWith(ym));
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+  const salesMTD = monthReports.reduce((s,r) => s+(r.sales?.total||0), 0);
+  const avgSale = monthReports.length ? salesMTD/monthReports.length : 0;
+  const estSales = avgSale * daysInMonth;
+  const unpaid = invoices.filter(i => i.status==='unpaid');
+  const unpaidAmt = unpaid.reduce((s,i) => s+i.amount, 0);
+  const monthInvoices = invoices.filter(i => i.date && i.date.startsWith(ym));
+  const purchMTD = monthInvoices.reduce((s,i) => s+i.amount, 0);
+  const daysWithPurch = [...new Set(monthInvoices.map(i => i.date))].length || 1;
+  const estPurch = (purchMTD/Math.max(daysWithPurch,1)) * daysInMonth;
+  const machMTD = machineReports.filter(r => r.date && r.date.startsWith(ym)).reduce((s,r) => s+(r.storeIncome||0), 0);
+  const margin = salesMTD > 0 ? ((salesMTD - purchMTD)/salesMTD*100).toFixed(1) : null;
+  document.getElementById('d-sales-mtd').textContent = fmtMoney(salesMTD);
+  document.getElementById('d-purch-mtd').textContent = fmtMoney(purchMTD);
+  document.getElementById('d-sales-est').textContent = fmtMoney(estSales);
+  document.getElementById('d-purch-est').textContent = fmtMoney(estPurch);
+  document.getElementById('d-margin').textContent = margin ? margin+'%' : '—';
+  document.getElementById('d-avg-sale').textContent = fmtMoney(avgSale);
+  document.getElementById('d-machine-inc').textContent = fmtMoney(machMTD);
+  document.getElementById('d-unpaid-amt').textContent = fmtMoney(unpaidAmt);
+  document.getElementById('d-unpaid-count').textContent = unpaid.length+' invoices';
+  document.getElementById('d-sales-days').textContent = monthReports.length+' days recorded';
+  // Category projections
+  const catMap = {};
+  monthReports.forEach(r => (r.specialty||[]).forEach(s => { if(!catMap[s.name]) catMap[s.name]={total:0,days:0}; catMap[s.name].total+=s.amount; catMap[s.name].days++; }));
+  const catKeys = Object.keys(catMap);
+  const projBody = document.getElementById('cat-proj-body');
+  if(!catKeys.length) { projBody.innerHTML='<div class="empty-state"><div>📊</div>Enter specialty category data in Daily Report to see projections</div>'; }
+  else {
+    projBody.innerHTML = `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:0 0 8px;border-bottom:0.5px solid var(--border);margin-bottom:8px"><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Category</span><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">MTD</span><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">Avg/Day</span><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">Est Month</span></div>`+
+    catKeys.map(k => {
+      const d=catMap[k]; const avg=d.total/Math.max(d.days,1); const est=avg*daysInMonth;
+      return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:13px;font-weight:500">${k}</span><span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--green)">${fmtMoney(d.total)}</span><span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--muted)">${fmtMoney(avg)}</span><span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--amber)">${fmtMoney(est)}</span></div>`;
+    }).join('');
+  }
+  // Weekly bars
+  const weekDays = [-6,-5,-4,-3,-2,-1,0].map(d => { const dt=new Date(); dt.setDate(dt.getDate()+d); return dt.toISOString().split('T')[0]; });
+  const weekData = weekDays.map(d => ({date:d, total:(dailyReports.find(r=>r.date===d)?.sales?.total||0)}));
+  const maxVal = Math.max(...weekData.map(d=>d.total), 1);
+  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  document.getElementById('weekly-bars').innerHTML = weekData.length ? weekData.map(d => {
+    const day = dayNames[new Date(d.date+'T12:00:00').getDay()];
+    const pct = Math.round((d.total/maxVal)*100);
+    return `<div class="bar-row"><div class="bar-label">${day}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--green)"></div></div><div class="bar-val">${fmtMoney(d.total)}</div></div>`;
+  }).join('') : '<div class="empty-state" style="padding:20px">No data yet</div>';
+}
+
+// ---- WEEKLY REPORT ----
+function updateWeeklyReport() {
+  const weeks = {};
+  dailyReports.forEach(r => {
+    if(!r.date) return;
+    const d = new Date(r.date+'T12:00:00');
+    const monday = new Date(d); monday.setDate(d.getDate()-((d.getDay()+6)%7));
+    const wk = monday.toISOString().split('T')[0];
+    if(!weeks[wk]) weeks[wk]={sales:0,purchases:0};
+    weeks[wk].sales += (r.sales?.total||0);
+  });
+  invoices.forEach(inv => {
+    if(!inv.date) return;
+    const d = new Date(inv.date+'T12:00:00');
+    const monday = new Date(d); monday.setDate(d.getDate()-((d.getDay()+6)%7));
+    const wk = monday.toISOString().split('T')[0];
+    if(!weeks[wk]) weeks[wk]={sales:0,purchases:0};
+    weeks[wk].purchases += inv.amount;
+  });
+  const sorted = Object.keys(weeks).sort().reverse().slice(0,8);
+  const body = document.getElementById('weekly-report-body');
+  if(!sorted.length) { body.innerHTML='<div class="empty-state"><div>📊</div>No data yet — enter daily reports to see weekly comparison</div>'; return; }
+  body.innerHTML = `<table class="report-table"><thead><tr><th>Week of</th><th class="num">Sales</th><th class="num">Purchases</th><th class="num">Gross Profit</th><th class="num">Margin</th></tr></thead><tbody>${
+    sorted.map(wk => {
+      const w=weeks[wk]; const profit=w.sales-w.purchases; const margin=w.sales>0?((profit/w.sales)*100).toFixed(1)+'%':'—';
+      return `<tr><td>${wk}</td><td class="num">${fmtMoney(w.sales)}</td><td class="num">${fmtMoney(w.purchases)}</td><td class="num" style="color:var(--green)">${fmtMoney(profit)}</td><td class="num">${margin}</td></tr>`;
+    }).join('')
+  }</tbody></table>`;
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
