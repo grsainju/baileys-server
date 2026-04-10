@@ -123,7 +123,7 @@ function fetchOrderCategories(startMs, endMs, callback) {
     page++;
     const apiPath = `/v3/merchants/${MERCHANT_ID}/orders?` +
       `filter=createdTime>=${startMs}&filter=createdTime<=${endMs}` +
-      `&expand=lineItems&limit=${limit}&offset=${offset}`;
+      `&expand=lineItems.elements.item.itemGroup&limit=${limit}&offset=${offset}`;
     cloverGet(apiPath, (err, data) => {
       if (err) { callback(err, null); return; }
       const elements = data.elements || [];
@@ -141,17 +141,26 @@ function aggregateCategories(orders) {
     if (order.state === 'OPEN' || !order.lineItems) return;
     (order.lineItems.elements || []).forEach(item => {
       if (item.refunded) return;
-      const catName = item.itemGroup?.name || 'Uncategorized';
-      const netAmt = ((item.price || 0) * (item.quantity || 1) - (item.discountAmount || 0)) / 100;
+      // Try multiple paths for category name
+      const catName = item.item?.itemGroup?.name
+        || item.itemGroup?.name
+        || (item.item?.categories?.elements?.[0]?.name)
+        || 'Uncategorized';
+      // Use item price * qty, subtract discounts
+      const unitPrice = (item.price || item.item?.price || 0) / 100;
+      const qty = item.quantity || 1;
+      const discount = (item.discountAmount || 0) / 100;
+      const netAmt = (unitPrice * qty) - discount;
+      if (netAmt <= 0) return;
       if (!cats[catName]) cats[catName] = { name: catName, netSales: 0, qty: 0 };
       cats[catName].netSales += netAmt;
-      cats[catName].qty += (item.quantity || 1);
+      cats[catName].qty += qty;
     });
   });
   return Object.values(cats)
     .filter(c => c.netSales > 0)
     .sort((a, b) => b.netSales - a.netSales)
-    .map(c => ({ ...c, netSales: +c.netSales.toFixed(2) }));
+    .map(c => ({ ...c, netSales: +c.netSales.toFixed(2), qty: +c.qty.toFixed(2) }));
 }
 
 function fetchAllPayments(startMs, endMs, callback) {
@@ -248,14 +257,14 @@ const server = http.createServer((req, res) => {
           const taxAmt = (p.taxAmount||0)/100;
           const tender = (p.tender?.label||'').toLowerCase();
           const tKey = (p.tender?.labelKey||'').toLowerCase();
-          tax += taxAmt; total += netAmt;
+          tax += Math.round(taxAmt * 100); total += netAmt;
           if(tKey.includes('cash')||tender.includes('cash')) cash += netAmt;
           else if(tKey.includes('debit')||tender.includes('debit')) debit += netAmt;
           else if(tKey.includes('credit')||tender.includes('credit')) credit += netAmt;
           else if(tKey.includes('ebt')||tender.includes('ebt')) ebt += netAmt;
           const dId = p.device?.id || '';
           if(kitchenId && dId === kitchenId) {
-            kTax += taxAmt; kTotal += netAmt;
+            kTax += Math.round(taxAmt * 100); kTotal += netAmt;
             if(tKey.includes('cash')||tender.includes('cash')) kCash += netAmt;
             else if(tKey.includes('debit')||tender.includes('debit')) kDebit += netAmt;
             else if(tKey.includes('credit')||tender.includes('credit')) kCredit += netAmt;
@@ -265,17 +274,17 @@ const server = http.createServer((req, res) => {
         // Fetch category breakdown in parallel
         fetchOrderCategories(startMs, endMs, (catErr, orders) => {
           const categories = catErr ? [] : aggregateCategories(orders || []);
-          const netSales = +(total - tax).toFixed(2);
-          const kNetSales = +(kTotal - kTax).toFixed(2);
+          const netSales = +(total - tax/100).toFixed(2);
+          const kNetSales = +(kTotal - kTax/100).toFixed(2);
           json({
             date, count: pmnts.length, kitchenDeviceFound: !!kitchenId,
             cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
-            ebt:+ebt.toFixed(2), tax:+tax.toFixed(2),
+            ebt:+ebt.toFixed(2), tax:+(tax/100).toFixed(2),
             netSales: netSales,
             grossSales: +total.toFixed(2),
             kitchen:{
               cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2), debit:+kDebit.toFixed(2),
-              ebt:+kEbt.toFixed(2), tax:+kTax.toFixed(2),
+              ebt:+kEbt.toFixed(2), tax:+(kTax/100).toFixed(2),
               total:+kTotal.toFixed(2), netSales: kNetSales
             },
             categories: categories
