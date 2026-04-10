@@ -76,10 +76,14 @@ function cloverPost(cloverPath, body, callback) {
 function fetchAllPayments(startMs, endMs, callback) {
   let allPayments = [];
   let offset = 0;
-  const limit = 100;
+  const limit = 1000; // Clover max per page
+  const MAX_PAGES = 20; // safety limit - handles up to 20,000 payments
+  let page = 0;
 
   function fetchPage() {
-    // Use createdTime range - Clover uses milliseconds
+    if (page >= MAX_PAGES) { callback(null, allPayments); return; }
+    page++;
+
     const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?` +
       `filter=createdTime>=${startMs}&filter=createdTime<=${endMs}` +
       `&expand=tender&limit=${limit}&offset=${offset}`;
