@@ -102,6 +102,15 @@ function cloverPost(cloverPath, body, callback) {
   req.end();
 }
 
+// Fetch Clover devices to get Kitchen device ID
+function fetchDevices(callback) {
+  cloverGet(`/v3/merchants/${MERCHANT_ID}/devices?limit=50`, (err, data) => {
+    if (err) { callback(err, null); return; }
+    const devices = data.elements || [];
+    callback(null, devices);
+  });
+}
+
 function fetchAllPayments(startMs, endMs, callback) {
   let allPayments = [];
   let offset = 0;
@@ -217,8 +226,10 @@ const server = http.createServer((req, res) => {
       // Kitchen breakdown
       let kCash=0, kCredit=0, kDebit=0, kEbt=0, kTax=0, kTotal=0;
       successful.forEach(p => {
-        const dName = (p.device?.name || '').toLowerCase();
-        if(dName === 'kitchen') {
+        // Match kitchen by device ID (name comes back as 'unknown' from payments API)
+        const dId = p.device?.id || '';
+        const isKitchen = kitchenId && dId === kitchenId;
+        if(isKitchen) {
           const amt = (p.amount||0)/100;
           const taxAmt = (p.taxAmount||0)/100;
           const tender = (p.tender?.label||'').toLowerCase();
@@ -235,13 +246,15 @@ const server = http.createServer((req, res) => {
         // All devices
         cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
         ebt:+ebt.toFixed(2), tax:+tax.toFixed(2), netSales:+total.toFixed(2), count:successful.length,
+        kitchenDeviceFound: !!kitchenId,
         // Kitchen only
         kitchen: {
           cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2), debit:+kDebit.toFixed(2),
           ebt:+kEbt.toFixed(2), tax:+kTax.toFixed(2), total:+kTotal.toFixed(2)
         }
       });
-    });
+    }); // end fetchAllPayments
+    }); // end fetchDevices
     return;
   }
 
