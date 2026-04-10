@@ -602,7 +602,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <div style="font-size:11px;font-weight:600;color:#6b6860;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px">Check Number</div>
       <input type="text" id="check-number" placeholder="e.g. 1042" style="width:100%;font-family:inherit;font-size:14px;padding:9px 10px;border:0.5px solid #ccc9be;border-radius:7px;outline:none">
     </div>
-    <select id="pay-modal-type" style="display:none"></select>
+    <input type="hidden" id="pay-modal-type" value="">
     <div style="display:flex;gap:8px">
       <button onclick="confirmMarkPaid()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Confirm Payment</button>
       <button onclick="closePayModal()" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
@@ -924,6 +924,14 @@ function addInvoice() {
     notes: document.getElementById('inv-notes').value
   };
   if(!inv.vendor || !inv.amount) { showToast('Enter vendor and amount'); return; }
+  // Duplicate check: same vendor + same invoice number
+  if(inv.num) {
+    const dup = invoices.find(i => i.num && i.num.trim().toLowerCase() === inv.num.trim().toLowerCase() && i.vendor.trim().toLowerCase() === inv.vendor.trim().toLowerCase());
+    if(dup) {
+      const proceed = confirm(`⚠️ Duplicate detected!\n\nInvoice #${inv.num} from ${inv.vendor} was already entered on ${dup.date} for ${fmtMoney(dup.amount)}.\n\nAdd anyway?`);
+      if(!proceed) return;
+    }
+  }
   invoices.unshift(inv);
   localStorage.setItem('bm_invoices', JSON.stringify(invoices));
   document.getElementById('inv-num').value='';
@@ -977,6 +985,20 @@ function bulkMarkPaid() {
   document.getElementById('check-number-row').style.display = 'none';
   document.getElementById('check-number').value = '';
   modal.style.display = 'flex';
+}
+
+
+function revertUnpaid(id) {
+  if(!confirm('Revert this invoice back to unpaid?')) return;
+  const inv = invoices.find(i => i.id===id);
+  if(!inv) return;
+  inv.status = 'unpaid';
+  delete inv.paytype;
+  delete inv.paidDate;
+  delete inv.checkNumber;
+  localStorage.setItem('bm_invoices', JSON.stringify(invoices));
+  renderInvoices();
+  showToast('Invoice reverted to unpaid');
 }
 
 function markPaid(id) {
@@ -1076,7 +1098,7 @@ function filterInvoices() {
         <td class="num">${fmtMoney(inv.amount)}</td>
         <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
         <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
-        <td>${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button>` : `<span style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</span>`}</td>
+        <td>${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button>` : `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>`}</td>
       </tr>`).join('')
     }</tbody></table>`;
 }
@@ -1162,7 +1184,7 @@ function renderInvoices() {
   if(!invoices.length) {
     allContainer.innerHTML = '<div class="empty-state"><div>📋</div>No invoices yet</div>';
   } else {
-    allContainer.innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th>Paid Date</th></tr></thead><tbody>${
+    allContainer.innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th>Paid Date</th><th></th></tr></thead><tbody>${
       invoices.map(inv => `<tr>
         <td>${inv.date}</td>
         <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
@@ -1171,6 +1193,7 @@ function renderInvoices() {
         <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
         <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
         <td style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</td>
+        <td>${inv.status==='paid' ? `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>` : ''}</td>
       </tr>`).join('')
     }</tbody></table>`;
   }
