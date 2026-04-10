@@ -1056,35 +1056,67 @@ function buildMachineGrid() {
     <div class="mcard">
       <div class="mcard-label">Machine ${i+1}</div>
       <div class="mcard-inputs">
-        <div class="fgroup"><label>Total In</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-in" oninput="calcMachines()"></div></div>
-        <div class="fgroup"><label>Total Out</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-out" oninput="calcMachines()"></div></div>
+        <div class="fgroup"><label>Total In</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-in" oninput="autoFillNet(${i})"></div></div>
+        <div class="fgroup"><label>Total Out</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-out" oninput="autoFillNet(${i})"></div></div>
       </div>
-      <div class="mcard-net" style="margin-top:6px;padding-top:6px;border-top:0.5px solid var(--border)">
-        <span style="font-size:11px;color:var(--muted)">Cumulative Net</span>
-        <strong id="m${i}-net" style="font-family:var(--mono);font-size:13px;color:var(--text)">$0</strong>
+      <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border)">
+        <div class="fgroup">
+          <label style="display:flex;align-items:center;gap:6px">
+            Net (editable)
+            <span id="m${i}-edited" style="display:none;font-size:10px;color:var(--amber);font-weight:600">✎ MANUAL</span>
+          </label>
+          <div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-net" 
+            style="font-weight:600;color:var(--green)"
+            oninput="onNetEdit(${i})"></div>
+        </div>
       </div>
-      <div class="mcard-net" style="margin-top:4px">
+      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:11px;color:var(--muted)">Prev Net</span>
-        <strong id="m${i}-prev" style="font-family:var(--mono);font-size:12px;color:var(--hint)">$0</strong>
+        <span id="m${i}-prev" style="font-family:var(--mono);font-size:12px;color:var(--hint)">$0</span>
       </div>
-      <div class="mcard-net" style="margin-top:4px;background:var(--green-l);border-radius:5px;padding:4px 6px">
+      <div style="margin-top:4px;background:var(--green-l);border-radius:5px;padding:5px 8px;display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:11px;color:var(--green);font-weight:600">Take Out</span>
-        <strong id="m${i}-takeout" style="font-family:var(--mono);font-size:14px;color:var(--green)">$0</strong>
+        <span id="m${i}-takeout" style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--green)">$0</span>
       </div>
     </div>
   `).join('');
+}
+function autoFillNet(i) {
+  const tin = getVal('m'+i+'-in');
+  const tout = getVal('m'+i+'-out');
+  const calcNet = tin - tout;
+  const netInput = document.getElementById('m'+i+'-net');
+  // Only auto-fill if not manually edited
+  if(!netInput.dataset.manual) {
+    netInput.value = Math.round(calcNet) || '';
+  }
+  calcMachines();
+}
+function onNetEdit(i) {
+  const netInput = document.getElementById('m'+i+'-net');
+  const tin = getVal('m'+i+'-in');
+  const tout = getVal('m'+i+'-out');
+  const calcNet = tin - tout;
+  const manualNet = getVal('m'+i+'-net');
+  const editedLabel = document.getElementById('m'+i+'-edited');
+  // Mark as manually edited if different from auto-calculated
+  if(Math.round(manualNet) !== Math.round(calcNet) && manualNet > 0) {
+    netInput.dataset.manual = '1';
+    if(editedLabel) editedLabel.style.display = 'inline';
+  } else {
+    delete netInput.dataset.manual;
+    if(editedLabel) editedLabel.style.display = 'none';
+  }
+  calcMachines();
 }
 function calcMachines() {
   let totalNet = 0;
   let totalTakeOut = 0;
   const takeouts = [];
   for(let i=0;i<8;i++) {
-    const tin = getVal('m'+i+'-in');
-    const tout = getVal('m'+i+'-out');
-    const net = tin - tout;
+    const net = getVal('m'+i+'-net') || (getVal('m'+i+'-in') - getVal('m'+i+'-out'));
     const prevNet = window._prevMachineNets ? (window._prevMachineNets[i] || 0) : 0;
     const takeout = Math.max(0, net - prevNet);
-    document.getElementById('m'+i+'-net').textContent = '$'+Math.round(net).toLocaleString();
     document.getElementById('m'+i+'-takeout').textContent = '$'+Math.round(takeout).toLocaleString();
     totalNet += net;
     totalTakeOut += takeout;
@@ -1123,6 +1155,11 @@ async function loadPrevMachineData() {
         const prevNet = window._prevMachineNets[i] || 0;
         const el = document.getElementById('m'+i+'-prev');
         if(el) el.textContent = '$'+Math.round(prevNet).toLocaleString();
+        // Clear manual flag when date changes
+        const netInput = document.getElementById('m'+i+'-net');
+        if(netInput) { delete netInput.dataset.manual; netInput.value = ''; }
+        const editedEl = document.getElementById('m'+i+'-edited');
+        if(editedEl) editedEl.style.display = 'none';
       }
       calcMachines();
     } else {
@@ -1149,10 +1186,11 @@ async function saveMachines() {
   const machines = Array.from({length:8}, (_,i) => {
     const tin = getVal('m'+i+'-in');
     const tout = getVal('m'+i+'-out');
-    const net = tin - tout;
+    const net = getVal('m'+i+'-net') || (tin - tout);
     const prevNet = window._prevMachineNets ? (window._prevMachineNets[i]||0) : 0;
     const takeout = Math.max(0, net - prevNet);
-    return {in:tin, out:tout, net:net, prevNet:prevNet, takeout:takeout};
+    const manualNet = !!document.getElementById('m'+i+'-net')?.dataset?.manual;
+    return {in:tin, out:tout, net:net, prevNet:prevNet, takeout:takeout, manualNet};
   });
   const totalNet = machines.reduce((s,m) => s+m.net, 0);
   const totalTakeOut = machines.reduce((s,m) => s+m.takeout, 0);
