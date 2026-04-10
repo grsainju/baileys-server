@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CLOVER_TOKEN = 'cea0b142-7593-6c1e-5e79-f1ae5ddbd603';
-const MERCHANT_ID = '536927510109317';
+const MERCHANT_ID = 'J5D10DJ83FVD1';
 const PORT = process.env.PORT || 3000;
 
 const ALLOWED_ORIGINS = [
