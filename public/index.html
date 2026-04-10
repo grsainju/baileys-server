@@ -265,7 +265,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
           <div class="card-icon" style="background:#e8f4ed">💰</div>
-          <div class="card-title">Sales (from Clover POS)</div>
+          <div class="card-title">All POS Sales (Register 1 + Register 2 + Kitchen)</div>
           <div class="card-badge tag tag-green" id="badge-sales">$0.00</div>
           <div class="card-chevron open">▼</div>
         </div>
@@ -276,12 +276,36 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
             <div class="fgroup"><label>Debit Card</label><div class="dollar"><input type="number" id="s-debit" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
             <div class="fgroup"><label>EBT / Food Stamp</label><div class="dollar"><input type="number" id="s-ebt" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
             <div class="fgroup"><label>Tax Collected</label><div class="dollar"><input type="number" id="s-tax" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
-            <div class="fgroup"><label>Kitchen Sales</label><div class="dollar"><input type="number" id="s-kitchen" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
           </div>
           <div class="divider"></div>
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:13px;color:var(--muted);font-weight:500">Total Sales</span>
             <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-sales">$0.00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- KITCHEN POS -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#e8f4ed">🍳</div>
+          <div class="card-title">Kitchen POS Sales</div>
+          <div class="card-badge tag tag-green" id="badge-kitchen">$0.00</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Sales from Kitchen register only — auto-filled when you Pull from Clover</div>
+          <div class="form-grid fg-3">
+            <div class="fgroup"><label>Cash Sales</label><div class="dollar"><input type="number" id="k-cash" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
+            <div class="fgroup"><label>Credit Card</label><div class="dollar"><input type="number" id="k-credit" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
+            <div class="fgroup"><label>Debit Card</label><div class="dollar"><input type="number" id="k-debit" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
+            <div class="fgroup"><label>EBT / Food Stamp</label><div class="dollar"><input type="number" id="k-ebt" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
+            <div class="fgroup"><label>Tax Collected</label><div class="dollar"><input type="number" id="k-tax" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
+          </div>
+          <div class="divider"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Kitchen Total</span>
+            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-kitchen">$0.00</span>
           </div>
         </div>
       </div>
@@ -775,8 +799,16 @@ async function parseCloverCSV() {
     if(d.debit  !== undefined) document.getElementById('s-debit').value  = d.debit.toFixed(2);
     if(d.ebt    !== undefined) document.getElementById('s-ebt').value    = d.ebt.toFixed(2);
     if(d.tax    !== undefined) document.getElementById('s-tax').value    = d.tax.toFixed(2);
-    if(d.kitchen !== undefined && d.kitchen > 0) document.getElementById('s-kitchen').value = d.kitchen.toFixed(2);
     calcSales();
+    // Kitchen breakdown
+    if(d.kitchen) {
+      if(d.kitchen.cash)   document.getElementById('k-cash').value   = d.kitchen.cash.toFixed(2);
+      if(d.kitchen.credit) document.getElementById('k-credit').value = d.kitchen.credit.toFixed(2);
+      if(d.kitchen.debit)  document.getElementById('k-debit').value  = d.kitchen.debit.toFixed(2);
+      if(d.kitchen.ebt)    document.getElementById('k-ebt').value    = d.kitchen.ebt.toFixed(2);
+      if(d.kitchen.tax)    document.getElementById('k-tax').value    = d.kitchen.tax.toFixed(2);
+      calcKitchen();
+    }
     status.textContent = `✓ ${d.count} payments pulled — Net ${fmtMoney(d.netSales)}`;
     status.className = 'clover-status clover-ok';
     status.style.display = 'inline-block';
@@ -861,6 +893,11 @@ function calcSales() {
   const t = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
   document.getElementById('total-sales').textContent = fmtMoney(t);
   document.getElementById('badge-sales').textContent = fmtMoney(t);
+}
+function calcKitchen() {
+  const t = getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt');
+  document.getElementById('total-kitchen').textContent = fmtMoney(t);
+  document.getElementById('badge-kitchen').textContent = fmtMoney(t);
 }
 function calcPayouts() {
   const t = getVal('p-cash')+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
@@ -972,7 +1009,7 @@ async function submitDailyReport() {
   const specialty = specialtyCategories.map((name,i) => ({name, amount: getVal('sc-'+i)}));
   const rec = {
     date,
-    sales: {cash:getVal('s-cash'), credit:getVal('s-credit'), debit:getVal('s-debit'), ebt:getVal('s-ebt'), tax:getVal('s-tax'), kitchen:getVal('s-kitchen'), total: getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt')},
+    sales: {cash:getVal('s-cash'), credit:getVal('s-credit'), debit:getVal('s-debit'), ebt:getVal('s-ebt'), tax:getVal('s-tax'), kitchen:getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt'), total: getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt')},
     payouts: {cash:getVal('p-cash'), lottery:getVal('p-lottery'), game:getVal('p-game'), lotteryRefund:getVal('p-lotref'), atm:getVal('p-atm'), misc:getVal('p-misc'), total: getVal('p-cash')+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc')},
     transfer: {mgTxn:getVal('mg-txn'), mgDep:getVal('mg-dep'), brTxn:getVal('br-txn'), brDep:getVal('br-dep')},
     deposit: {pos:getVal('d-pos'), lottery:getVal('d-lottery'), toy:getVal('d-toy'), coin:getVal('d-coin'), other:getVal('d-other'), total: getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other')},
