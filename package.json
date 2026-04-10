@@ -1,0 +1,12 @@
+{
+  "name": "baileys-market-server",
+  "version": "1.0.0",
+  "description": "Bailey's Market Clover API proxy server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
