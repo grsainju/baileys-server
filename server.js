@@ -183,9 +183,11 @@ const server = http.createServer((req, res) => {
     const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
     const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
     fetchDevices((devErr, devList) => {
-      const kitchenDev = (devList||[]).find(d => (d.name||'').toLowerCase() === 'kitchen');
-      const kitchenId = kitchenDev ? kitchenDev.id : null;
-      console.log('Devices:', (devList||[]).map(d=>d.name+':'+d.id.slice(0,8)).join(', '));
+      // Known device IDs for Bailey's Market
+      const KITCHEN_ID = 'cc044434-defb-0585-8547-a52227f9f17c';
+      const kitchenDev = (devList||[]).find(d => d.id === KITCHEN_ID || (d.name||'').toLowerCase() === 'kitchen');
+      const kitchenId = kitchenDev ? kitchenDev.id : KITCHEN_ID;
+      console.log('Kitchen ID:', kitchenId);
       fetchAllPayments(startMs, endMs, (err, payments) => {
         if (err) { json({error: err.message}, 500); return; }
         const pmnts = payments.filter(p => p.result === 'SUCCESS' || p.result === 'REFUND');
