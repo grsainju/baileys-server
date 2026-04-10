@@ -310,19 +310,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
       </div>
 
-      <!-- CATEGORY SALES -->
-      <div class="card" id="category-sales-card" style="display:none">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#eaf0fb">📊</div>
-          <div class="card-title">Sales by Category</div>
-          <div class="card-badge tag tag-blue" id="badge-categories">—</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body" id="category-sales-body">
-          <div class="empty-state"><div>📊</div>Pull from Clover to see category breakdown</div>
-        </div>
-      </div>
-
       <!-- PAYOUTS -->
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
@@ -412,20 +399,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
       </div>
 
-      <!-- SPECIALTY CATEGORIES -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#fef3e2">🥐</div>
-          <div class="card-title">Specialty Categories</div>
-          <div class="card-badge tag tag-amber" id="badge-specialty">$0.00</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body" id="specialty-body">
-          <div id="specialty-rows"></div>
-          <button class="add-row-btn" onclick="addSpecialtyRow()">+ Add Category</button>
-        </div>
-      </div>
-
       <!-- NOTES -->
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
@@ -435,6 +408,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
         <div class="card-body">
           <textarea id="daily-notes" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border:0.5px solid var(--border2);border-radius:7px;resize:vertical;outline:none" placeholder="Any notes for today..."></textarea>
+        </div>
+      </div>
+
+      <!-- CATEGORY SALES -->
+      <div class="card" id="category-sales-card" style="display:none">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#eaf0fb">📊</div>
+          <div class="card-title">Sales by Category</div>
+          <div class="card-badge tag tag-blue" id="badge-categories">—</div>
+          <div class="card-chevron">▼</div>
+        </div>
+        <div class="card-body open" id="category-sales-body">
+          <div class="empty-state"><div>📊</div>Pull from Clover to see category breakdown</div>
         </div>
       </div>
 
