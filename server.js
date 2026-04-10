@@ -102,12 +102,10 @@ function cloverPost(cloverPath, body, callback) {
   req.end();
 }
 
-// Fetch Clover devices to get Kitchen device ID
 function fetchDevices(callback) {
   cloverGet(`/v3/merchants/${MERCHANT_ID}/devices?limit=50`, (err, data) => {
-    if (err) { callback(err, null); return; }
-    const devices = data.elements || [];
-    callback(null, devices);
+    if(err) { callback(err, []); return; }
+    callback(null, data.elements || []);
   });
 }
 
@@ -164,33 +162,10 @@ const server = http.createServer((req, res) => {
     res.end(JSON.stringify(data));
   };
 
-
-  // DEBUG - device breakdown
   if (req.method === 'GET' && pathname === '/api/debug-devices') {
-    const date = parsed.query.date || '2026-04-09';
-    const [yyyy, mm, dd] = date.split('-').map(Number);
-    const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
-    const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
-    fetchAllPayments(startMs, endMs, (err, payments) => {
-      if (err) { json({error: err.message}, 500); return; }
-      // Include all non-voided payments — refunds come as negative amounts and cancel out
-      const successful = payments.filter(p => p.result === 'SUCCESS' || p.result === 'REFUND');
-      const devices = {};
-      successful.forEach(p => {
-        const dName = p.device?.name || 'unknown';
-        const dId = (p.device?.id || 'unknown').slice(0,8);
-        const key = dName;
-        if(!devices[key]) devices[key] = {name:dName, id:dId, count:0, total:0};
-        devices[key].count++;
-        devices[key].total += (p.amount||0)/100;
-      });
-      const sample = successful[0] || {};
-      json({
-        date, totalPayments: successful.length,
-        devices: Object.values(devices),
-        sampleDevice: sample.device || null,
-        sampleKeys: Object.keys(sample)
-      });
+    fetchDevices((err, devices) => {
+      if(err) { json({error: err.message}, 500); return; }
+      json({devices: devices.map(d => ({id:d.id, name:d.name, model:d.model}))});
     });
     return;
   }
@@ -207,56 +182,46 @@ const server = http.createServer((req, res) => {
     const [yyyy, mm, dd] = date.split('-').map(Number);
     const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
     const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
-    fetchAllPayments(startMs, endMs, (err, payments) => {
-      if (err) { json({error: err.message}, 500); return; }
-      // Include all non-voided payments — refunds come as negative amounts and cancel out
-      const successful = payments.filter(p => p.result === 'SUCCESS' || p.result === 'REFUND');
-      let cash=0, credit=0, debit=0, ebt=0, tax=0, kitchen=0, total=0;
-      successful.forEach(p => {
-        const amt = (p.amount || 0) / 100;
-        const taxAmt = (p.taxAmount || 0) / 100;
-        const tender = (p.tender?.label || '').toLowerCase();
-        const tenderKey = (p.tender?.labelKey || '').toLowerCase();
-        tax += Math.round(taxAmt * 100) / 100; total += amt;
-        if (tenderKey.includes('cash') || tender.includes('cash')) cash += amt;
-        else if (tenderKey.includes('debit') || tender.includes('debit')) debit += amt;
-        else if (tenderKey.includes('credit') || tender.includes('credit')) credit += amt;
-        else if (tenderKey.includes('ebt') || tender.includes('ebt') || tender.includes('food')) ebt += amt;
-      });
-      // Kitchen breakdown
-      let kCash=0, kCredit=0, kDebit=0, kEbt=0, kTax=0, kTotal=0;
-      successful.forEach(p => {
-        // Match kitchen by device ID (name comes back as 'unknown' from payments API)
-        const dId = p.device?.id || '';
-        const isKitchen = kitchenId && dId === kitchenId;
-        if(isKitchen) {
+    fetchDevices((devErr, devList) => {
+      const kitchenDev = (devList||[]).find(d => (d.name||'').toLowerCase() === 'kitchen');
+      const kitchenId = kitchenDev ? kitchenDev.id : null;
+      console.log('Devices:', (devList||[]).map(d=>d.name+':'+d.id.slice(0,8)).join(', '));
+      fetchAllPayments(startMs, endMs, (err, payments) => {
+        if (err) { json({error: err.message}, 500); return; }
+        const pmnts = payments.filter(p => p.result === 'SUCCESS' || p.result === 'REFUND');
+        let cash=0, credit=0, debit=0, ebt=0, tax=0, total=0;
+        let kCash=0, kCredit=0, kDebit=0, kEbt=0, kTax=0, kTotal=0;
+        pmnts.forEach(p => {
           const amt = (p.amount||0)/100;
           const taxAmt = (p.taxAmount||0)/100;
           const tender = (p.tender?.label||'').toLowerCase();
-          const tenderKey = (p.tender?.labelKey||'').toLowerCase();
-          kTax += taxAmt; kTotal += amt;
-          if(tenderKey.includes('cash')||tender.includes('cash')) kCash += amt;
-          else if(tenderKey.includes('debit')||tender.includes('debit')) kDebit += amt;
-          else if(tenderKey.includes('credit')||tender.includes('credit')) kCredit += amt;
-          else if(tenderKey.includes('ebt')||tender.includes('ebt')) kEbt += amt;
-        }
+          const tKey = (p.tender?.labelKey||'').toLowerCase();
+          tax += taxAmt; total += amt;
+          if(tKey.includes('cash')||tender.includes('cash')) cash += amt;
+          else if(tKey.includes('debit')||tender.includes('debit')) debit += amt;
+          else if(tKey.includes('credit')||tender.includes('credit')) credit += amt;
+          else if(tKey.includes('ebt')||tender.includes('ebt')) ebt += amt;
+          const dId = p.device?.id || '';
+          if(kitchenId && dId === kitchenId) {
+            kTax += taxAmt; kTotal += amt;
+            if(tKey.includes('cash')||tender.includes('cash')) kCash += amt;
+            else if(tKey.includes('debit')||tender.includes('debit')) kDebit += amt;
+            else if(tKey.includes('credit')||tender.includes('credit')) kCredit += amt;
+            else if(tKey.includes('ebt')||tender.includes('ebt')) kEbt += amt;
+          }
+        });
+        json({
+          date, count: pmnts.length, kitchenDeviceFound: !!kitchenId,
+          cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
+          ebt:+ebt.toFixed(2), tax:+tax.toFixed(2), netSales:+total.toFixed(2),
+          kitchen:{cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2), debit:+kDebit.toFixed(2),
+            ebt:+kEbt.toFixed(2), tax:+kTax.toFixed(2), total:+kTotal.toFixed(2)}
+        });
       });
-      json({
-        date,
-        // All devices
-        cash:+cash.toFixed(2), credit:+credit.toFixed(2), debit:+debit.toFixed(2),
-        ebt:+ebt.toFixed(2), tax:+tax.toFixed(2), netSales:+total.toFixed(2), count:successful.length,
-        kitchenDeviceFound: !!kitchenId,
-        // Kitchen only
-        kitchen: {
-          cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2), debit:+kDebit.toFixed(2),
-          ebt:+kEbt.toFixed(2), tax:+kTax.toFixed(2), total:+kTotal.toFixed(2)
-        }
-      });
-    }); // end fetchAllPayments
-    }); // end fetchDevices
+    });
     return;
   }
+
 
   // ---- CLOVER ITEMS ----
   if (req.method === 'GET' && pathname === '/api/items') {
