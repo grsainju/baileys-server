@@ -435,20 +435,35 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div class="page" id="page-machines">
       <div class="page-header">
         <div class="page-title">Game Machines</div>
-        <div class="page-sub">Enter Total In / Total Out from each machine's printed report</div>
+        <div class="page-sub">Enter Total In and Total Out from each machine's printed report. The app calculates how much to take out today.</div>
       </div>
       <div class="date-bar">
         <label>Report Date</label>
-        <input type="date" id="machine-date">
+        <input type="date" id="machine-date" onchange="loadPrevMachineData()">
       </div>
+
+      <!-- MACHINE GRID -->
       <div class="mgrid" id="machine-grid"></div>
-      <div class="machine-total" id="machine-total" style="margin-top:12px">
-        <div class="mt-item"><div class="mt-label">Total Net</div><div class="mt-val" id="mt-net">$0.00</div></div>
-        <div class="mt-item"><div class="mt-label">Vendor (40%)</div><div class="mt-val" id="mt-vendor">$0.00</div></div>
-        <div class="mt-item"><div class="mt-label">Our Income (60%)</div><div class="mt-val" id="mt-store">$0.00</div></div>
+
+      <!-- SUMMARY -->
+      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-top:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px">Today's Summary</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="metric"><div class="metric-label">Total Take Out</div><div class="metric-val green" id="mt-takeout">$0.00</div><div class="metric-sub">Cash to collect today</div></div>
+          <div class="metric"><div class="metric-label">Combined Net</div><div class="metric-val" id="mt-net">$0.00</div><div class="metric-sub">All machines cumulative</div></div>
+          <div class="metric"><div class="metric-label">Vendor Pay (40%)</div><div class="metric-val amber" id="mt-vendor">$0.00</div><div class="metric-sub">Of total take out</div></div>
+          <div class="metric"><div class="metric-label">Our Income (60%)</div><div class="metric-val green" id="mt-store">$0.00</div><div class="metric-sub">Of total take out</div></div>
+        </div>
+
+        <!-- Per machine take out table -->
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Take Out Per Machine</div>
+        <div id="machine-takeout-table" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px">
+        </div>
       </div>
+
       <div class="submit-bar" style="margin-top:12px">
         <button class="submit-btn" onclick="saveMachines()">Save Machine Report</button>
+        <button onclick="resetMachines()" style="background:none;border:0.5px solid var(--border2);padding:10px 16px;border-radius:8px;font-family:var(--font);font-size:14px;cursor:pointer;color:var(--muted)">Reset All Machines</button>
         <span class="save-success" id="machine-saved">✓ Saved</span>
       </div>
     </div>
@@ -785,6 +800,9 @@ async function init() {
   }
 
   buildMachineGrid();
+  window._prevMachineNets = Array(8).fill(0);
+  // Load prev day data after grid is built
+  setTimeout(loadPrevMachineData, 100);
   buildSpecialtyRows();
   renderInvoices();
   updateDashboard();
@@ -1038,43 +1056,121 @@ function buildMachineGrid() {
     <div class="mcard">
       <div class="mcard-label">Machine ${i+1}</div>
       <div class="mcard-inputs">
-        <div class="fgroup"><label>Total In</label><div class="dollar"><input type="number" step="0.01" placeholder="0.00" id="m${i}-in" oninput="calcMachines()"></div></div>
-        <div class="fgroup"><label>Total Out</label><div class="dollar"><input type="number" step="0.01" placeholder="0.00" id="m${i}-out" oninput="calcMachines()"></div></div>
+        <div class="fgroup"><label>Total In</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-in" oninput="calcMachines()"></div></div>
+        <div class="fgroup"><label>Total Out</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-out" oninput="calcMachines()"></div></div>
       </div>
-      <div class="mcard-net">
-        <span>Net</span>
-        <strong id="m${i}-net">$0.00</strong>
+      <div class="mcard-net" style="margin-top:6px;padding-top:6px;border-top:0.5px solid var(--border)">
+        <span style="font-size:11px;color:var(--muted)">Cumulative Net</span>
+        <strong id="m${i}-net" style="font-family:var(--mono);font-size:13px;color:var(--text)">$0</strong>
+      </div>
+      <div class="mcard-net" style="margin-top:4px">
+        <span style="font-size:11px;color:var(--muted)">Prev Net</span>
+        <strong id="m${i}-prev" style="font-family:var(--mono);font-size:12px;color:var(--hint)">$0</strong>
+      </div>
+      <div class="mcard-net" style="margin-top:4px;background:var(--green-l);border-radius:5px;padding:4px 6px">
+        <span style="font-size:11px;color:var(--green);font-weight:600">Take Out</span>
+        <strong id="m${i}-takeout" style="font-family:var(--mono);font-size:14px;color:var(--green)">$0</strong>
       </div>
     </div>
   `).join('');
 }
 function calcMachines() {
   let totalNet = 0;
+  let totalTakeOut = 0;
+  const takeouts = [];
   for(let i=0;i<8;i++) {
-    const net = getVal('m'+i+'-in') - getVal('m'+i+'-out');
-    document.getElementById('m'+i+'-net').textContent = fmtMoney(net);
+    const tin = getVal('m'+i+'-in');
+    const tout = getVal('m'+i+'-out');
+    const net = tin - tout;
+    const prevNet = window._prevMachineNets ? (window._prevMachineNets[i] || 0) : 0;
+    const takeout = Math.max(0, net - prevNet);
+    document.getElementById('m'+i+'-net').textContent = '$'+Math.round(net).toLocaleString();
+    document.getElementById('m'+i+'-takeout').textContent = '$'+Math.round(takeout).toLocaleString();
     totalNet += net;
+    totalTakeOut += takeout;
+    takeouts.push(takeout);
   }
   document.getElementById('mt-net').textContent = fmtMoney(totalNet);
-  document.getElementById('mt-vendor').textContent = fmtMoney(totalNet * 0.4);
-  document.getElementById('mt-store').textContent = fmtMoney(totalNet * 0.6);
+  document.getElementById('mt-takeout').textContent = fmtMoney(totalTakeOut);
+  document.getElementById('mt-vendor').textContent = fmtMoney(totalTakeOut * 0.4);
+  document.getElementById('mt-store').textContent = fmtMoney(totalTakeOut * 0.6);
+  // Per machine takeout table
+  const table = document.getElementById('machine-takeout-table');
+  if(table) {
+    table.innerHTML = takeouts.map((t,i) => `
+      <div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:7px;border:0.5px solid var(--border)">
+        <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">M${i+1}</div>
+        <div style="font-family:var(--mono);font-size:13px;font-weight:500;color:${t>0?'var(--green)':'var(--hint)'}">\$${Math.round(t).toLocaleString()}</div>
+      </div>`).join('');
+  }
+}
+
+// Load previous day's machine data to calculate take out
+async function loadPrevMachineData() {
+  const date = document.getElementById('machine-date').value;
+  if(!date) return;
+  // Get yesterday's date
+  const d = new Date(date + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  const prevDate = d.toISOString().split('T')[0];
+  try {
+    const data = await apiGet('/api/machines?date=' + prevDate);
+    if(data && data.length > 0) {
+      const prev = data[0];
+      window._prevMachineNets = (prev.machines || []).map(m => m.net || 0);
+      // Update prev net displays
+      for(let i=0;i<8;i++) {
+        const prevNet = window._prevMachineNets[i] || 0;
+        const el = document.getElementById('m'+i+'-prev');
+        if(el) el.textContent = '$'+Math.round(prevNet).toLocaleString();
+      }
+      calcMachines();
+    } else {
+      window._prevMachineNets = Array(8).fill(0);
+      calcMachines();
+    }
+  } catch(e) {
+    window._prevMachineNets = Array(8).fill(0);
+  }
+}
+
+function resetMachines() {
+  if(!confirm('Reset all machines? This sets previous net to 0 for all machines (use after physical reset).')) return;
+  window._prevMachineNets = Array(8).fill(0);
+  for(let i=0;i<8;i++) {
+    const el = document.getElementById('m'+i+'-prev');
+    if(el) el.textContent = '$0';
+  }
+  calcMachines();
+  showToast('Machines reset — previous net cleared');
 }
 async function saveMachines() {
   const date = document.getElementById('machine-date').value;
-  const machines = Array.from({length:8}, (_,i) => ({
-    in: getVal('m'+i+'-in'), out: getVal('m'+i+'-out'), net: getVal('m'+i+'-in')-getVal('m'+i+'-out')
-  }));
+  const machines = Array.from({length:8}, (_,i) => {
+    const tin = getVal('m'+i+'-in');
+    const tout = getVal('m'+i+'-out');
+    const net = tin - tout;
+    const prevNet = window._prevMachineNets ? (window._prevMachineNets[i]||0) : 0;
+    const takeout = Math.max(0, net - prevNet);
+    return {in:tin, out:tout, net:net, prevNet:prevNet, takeout:takeout};
+  });
   const totalNet = machines.reduce((s,m) => s+m.net, 0);
-  const dbRec = {store:'baileys', report_date:date, machines:machines,
-    total_net:totalNet, vendor_pay:totalNet*0.4, store_income:totalNet*0.6, updated_at:new Date().toISOString()};
+  const totalTakeOut = machines.reduce((s,m) => s+m.takeout, 0);
+  const dbRec = {
+    store:'baileys', report_date:date, machines:machines,
+    total_net:totalNet, vendor_pay:totalTakeOut*0.4, store_income:totalTakeOut*0.6,
+    updated_at:new Date().toISOString()
+  };
   try {
     await apiPost('/api/machines', dbRec);
-    const rec = {date, machines, totalNet, vendorPay:totalNet*0.4, storeIncome:totalNet*0.6};
+    const rec = {date, machines, totalNet, totalTakeOut, vendorPay:totalTakeOut*0.4, storeIncome:totalTakeOut*0.6};
     const idx = machineReports.findIndex(r => r.date === date);
     if(idx>=0) machineReports[idx]=rec; else machineReports.push(rec);
+    // Update prevNets for next entry
+    window._prevMachineNets = machines.map(m => m.net);
     document.getElementById('machine-saved').style.display = 'inline';
     setTimeout(() => document.getElementById('machine-saved').style.display='none', 3000);
-    showToast('Machine report saved to database');
+    showToast('Machine report saved');
   } catch(e) { showToast('Save failed: ' + e.message); }
 }
 
