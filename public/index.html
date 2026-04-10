@@ -424,6 +424,30 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         <div class="page-title">Invoice Tracker</div>
         <div class="page-sub">Enter invoices when received. Update payment status when paid.</div>
       </div>
+
+      <!-- INVOICE SEARCH BAR -->
+      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:12px 15px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <input type="text" id="inv-search" placeholder="Search by vendor name..." style="flex:1;min-width:180px;font-family:var(--font);font-size:14px;padding:8px 12px;border:0.5px solid var(--border2);border-radius:7px;outline:none" oninput="filterInvoices()">
+        <select id="inv-filter-status" style="font-family:var(--font);font-size:13px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white" onchange="filterInvoices()">
+          <option value="all">All Invoices</option>
+          <option value="unpaid">Unpaid Only</option>
+          <option value="paid">Paid Only</option>
+        </select>
+        <button onclick="clearInvSearch()" style="background:none;border:0.5px solid var(--border2);padding:8px 12px;border-radius:7px;font-family:var(--font);font-size:13px;color:var(--muted);cursor:pointer">Clear</button>
+      </div>
+
+      <!-- SEARCH RESULTS (shown when searching) -->
+      <div id="inv-search-results" style="display:none">
+        <div class="card">
+          <div class="card-head" style="cursor:default;background:var(--info-light,#eaf0fb)">
+            <div class="card-icon" style="background:#eaf0fb">🔍</div>
+            <div class="card-title" id="inv-search-title">Search Results</div>
+            <div class="card-badge tag tag-blue" id="inv-search-count">0</div>
+          </div>
+          <div class="card-body open" id="inv-search-list"></div>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
           <div class="card-icon" style="background:#eaf0fb">➕</div>
@@ -1001,6 +1025,106 @@ function confirmMarkPaid() {
 function closePayModal() {
   document.getElementById('pay-modal').style.display = 'none';
 }
+
+function filterInvoices() {
+  const q = document.getElementById('inv-search').value.trim().toLowerCase();
+  const status = document.getElementById('inv-filter-status').value;
+  const resultsDiv = document.getElementById('inv-search-results');
+
+  if(!q && status === 'all') {
+    resultsDiv.style.display = 'none';
+    return;
+  }
+
+  let filtered = invoices.filter(inv => {
+    const matchVendor = !q || (inv.vendor||'').toLowerCase().includes(q);
+    const matchStatus = status === 'all' || inv.status === status;
+    return matchVendor && matchStatus;
+  });
+
+  resultsDiv.style.display = 'block';
+  const total = filtered.reduce((s,i) => s+i.amount, 0);
+  const unpaidCount = filtered.filter(i => i.status==='unpaid').length;
+  document.getElementById('inv-search-count').textContent = filtered.length + ' found — ' + fmtMoney(total);
+
+  const title = q ? `"${q}"` : 'Filtered';
+  document.getElementById('inv-search-title').textContent = title + (status !== 'all' ? ' — ' + status : '');
+
+  const container = document.getElementById('inv-search-list');
+  if(!filtered.length) {
+    container.innerHTML = '<div class="empty-state"><div>🔍</div>No invoices found</div>';
+    return;
+  }
+
+  const hasUnpaid = filtered.some(i => i.status === 'unpaid');
+  container.innerHTML = `
+    ${hasUnpaid ? `<div id="bulk-pay-bar-search" style="display:none;background:var(--green-l);border:0.5px solid var(--green-m);border-radius:8px;padding:10px 14px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:500;color:var(--green)" id="bulk-selected-label-s">0 selected</span>
+      <span style="font-size:13px;font-family:var(--mono);color:var(--green)" id="bulk-selected-total-s">$0.00</span>
+      <button onclick="bulkMarkPaidSearch()" style="margin-left:auto;background:var(--green);color:white;border:none;padding:7px 16px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Pay Selected</button>
+      <button onclick="clearSelectionSearch()" style="background:none;border:0.5px solid var(--border2);padding:7px 12px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer">Clear</button>
+    </div>` : ''}
+    <table class="inv-table"><thead><tr>
+      ${hasUnpaid ? '<th style="width:32px"><input type="checkbox" id="select-all-s" onclick="toggleSelectAllSearch(this)"></th>' : '<th></th>'}
+      <th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th></th>
+    </tr></thead><tbody>${
+      filtered.map(inv => `<tr>
+        <td>${inv.status==='unpaid' ? `<input type="checkbox" class="inv-cb-s" data-id="${inv.id}" data-amount="${inv.amount}" onchange="updateBulkBarSearch()">` : ''}</td>
+        <td>${inv.date}</td>
+        <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
+        <td>${inv.vendor}</td>
+        <td class="num">${fmtMoney(inv.amount)}</td>
+        <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
+        <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
+        <td>${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button>` : `<span style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</span>`}</td>
+      </tr>`).join('')
+    }</tbody></table>`;
+}
+
+function clearInvSearch() {
+  document.getElementById('inv-search').value = '';
+  document.getElementById('inv-filter-status').value = 'all';
+  document.getElementById('inv-search-results').style.display = 'none';
+}
+
+function toggleSelectAllSearch(cb) {
+  document.querySelectorAll('.inv-cb-s').forEach(c => c.checked = cb.checked);
+  updateBulkBarSearch();
+}
+function updateBulkBarSearch() {
+  const checked = [...document.querySelectorAll('.inv-cb-s:checked')];
+  const bar = document.getElementById('bulk-pay-bar-search');
+  if(!bar) return;
+  if(checked.length > 0) {
+    bar.style.display = 'flex';
+    const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
+    document.getElementById('bulk-selected-label-s').textContent = checked.length + ' invoice' + (checked.length>1?'s':'') + ' selected';
+    document.getElementById('bulk-selected-total-s').textContent = fmtMoney(total);
+  } else {
+    bar.style.display = 'none';
+  }
+}
+function clearSelectionSearch() {
+  document.querySelectorAll('.inv-cb-s').forEach(c => c.checked = false);
+  const selectAll = document.getElementById('select-all-s');
+  if(selectAll) selectAll.checked = false;
+  updateBulkBarSearch();
+}
+function bulkMarkPaidSearch() {
+  const checked = [...document.querySelectorAll('.inv-cb-s:checked')];
+  if(!checked.length) return;
+  const ids = checked.map(c => c.dataset.id);
+  const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
+  const modal = document.getElementById('pay-modal');
+  document.getElementById('pay-modal-vendor').textContent = ids.length + ' invoices — Total ' + fmtMoney(total);
+  document.getElementById('pay-modal-id').value = ids.join(',');
+  document.getElementById('pay-modal-type').value = '';
+  document.querySelectorAll('.paytype-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('check-number-row').style.display = 'none';
+  document.getElementById('check-number').value = '';
+  modal.style.display = 'flex';
+}
+
 function renderInvoices() {
   const unpaid = invoices.filter(i => i.status==='unpaid');
   const unpaidTotal = unpaid.reduce((s,i) => s+i.amount, 0);
@@ -1051,6 +1175,10 @@ function renderInvoices() {
     }</tbody></table>`;
   }
   updateDashboard();
+  // Refresh search if active
+  const _s = document.getElementById('inv-search');
+  const _f = document.getElementById('inv-filter-status');
+  if(_s && (_s.value.trim() || (_f && _f.value !== 'all'))) filterInvoices();
 }
 
 // ---- DASHBOARD ----
