@@ -967,7 +967,7 @@ async function saveMachines() {
 }
 
 // ---- DAILY REPORT SAVE ----
-function submitDailyReport() {
+async function submitDailyReport() {
   const date = document.getElementById('report-date').value;
   const specialty = specialtyCategories.map((name,i) => ({name, amount: getVal('sc-'+i)}));
   const rec = {
@@ -991,7 +991,7 @@ function loadVendorList() {
   const dl = document.getElementById('vendor-list');
   dl.innerHTML = vendors.map(v => `<option value="${v}">`).join('');
 }
-function addInvoice() {
+async function addInvoice() {
   const inv = {
     id: Date.now().toString(),
     date: document.getElementById('inv-date').value,
@@ -1082,7 +1082,7 @@ function revertUnpaid(id) {
   document.getElementById('revert-modal-detail').textContent = inv.vendor + ' — ' + fmtMoney(inv.amount) + (inv.num ? ' · Invoice #' + inv.num : '') + (inv.paidDate ? ' · Paid ' + inv.paidDate : '');
   document.getElementById('revert-modal').style.display = 'flex';
 }
-function confirmRevert() {
+async function confirmRevert() {
   const id = document.getElementById('revert-modal-id').value;
   const inv = invoices.find(i => i.id===id);
   if(!inv) return;
@@ -1116,7 +1116,7 @@ function selectPayType(type) {
   checkRow.style.display = type === 'check' ? 'block' : 'none';
   if(type !== 'check') document.getElementById('check-number').value = '';
 }
-function confirmMarkPaid() {
+async function confirmMarkPaid() {
   const idField = document.getElementById('pay-modal-id').value;
   const paytype = document.getElementById('pay-modal-type').value;
   if(!paytype) { showToast('Select a payment method'); return; }
