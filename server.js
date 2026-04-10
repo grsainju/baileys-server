@@ -405,8 +405,10 @@ const server = http.createServer((req, res) => {
   // ---- MACHINE REPORTS ----
   if (req.method === 'GET' && pathname === '/api/machines') {
     const month = parsed.query.month;
-    let query = '?store=eq.baileys&order=report_date.desc';
-    if (month) query = `?store=eq.baileys&report_date=gte.${month}-01&report_date=lte.${month}-31&order=report_date.desc`;
+    const date = parsed.query.date;
+    let query = '?store=eq.baileys&order=report_date.desc&limit=1';
+    if (date) query = `?store=eq.baileys&report_date=eq.${date}`;
+    else if (month) query = `?store=eq.baileys&report_date=gte.${month}-01&report_date=lte.${month}-31&order=report_date.desc`;
     supabase('GET', 'machine_reports', query, null, (err, data, status) => {
       if (err) { json({error: err.message}, 500); return; }
       json(data, status);
