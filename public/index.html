@@ -619,10 +619,14 @@ function toggleCard(head) {
   chev.classList.toggle('open');
 }
 function init() {
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('report-date').value = today;
-  document.getElementById('machine-date').value = today;
-  document.getElementById('inv-date').value = today;
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const todayStr = today.toISOString().split('T')[0];
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  document.getElementById('report-date').value = yesterdayStr;
+  document.getElementById('machine-date').value = yesterdayStr;
+  document.getElementById('inv-date').value = todayStr;
   buildMachineGrid();
   buildSpecialtyRows();
   renderInvoices();
