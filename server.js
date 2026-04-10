@@ -182,6 +182,31 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+
+  // DEBUG - returns raw Clover data for troubleshooting
+  if (req.method === 'GET' && pathname === '/api/debug') {
+    const date = parsed.query.date || '2026-04-09';
+    const [yyyy, mm, dd] = date.split('-').map(Number);
+    const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
+    const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
+    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=tender&limit=5`;
+    cloverGet(apiPath, (err, data, status) => {
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({startMs, endMs, startDate: new Date(startMs).toISOString(), endDate: new Date(endMs).toISOString(), httpStatus: status, error: err?.message, data}, null, 2));
+    });
+    return;
+  }
+
+  // DEBUG - get most recent 5 payments regardless of date
+  if (req.method === 'GET' && pathname === '/api/debug-recent') {
+    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?expand=tender&limit=5&orderBy=createdTime&order=DESC`;
+    cloverGet(apiPath, (err, data, status) => {
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({httpStatus: status, error: err?.message, data}, null, 2));
+    });
+    return;
+  }
+
   // GET /api/items?q=milk
   if (req.method === 'GET' && pathname === '/api/items') {
     const q = parsed.query.q || '';
