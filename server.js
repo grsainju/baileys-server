@@ -164,7 +164,8 @@ const server = http.createServer((req, res) => {
     const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
     fetchAllPayments(startMs, endMs, (err, payments) => {
       if (err) { json({error: err.message}, 500); return; }
-      const successful = payments.filter(p => p.result === 'SUCCESS');
+      // Include all non-voided payments — refunds come as negative amounts and cancel out
+      const successful = payments.filter(p => p.result === 'SUCCESS' || p.result === 'REFUND');
       const devices = {};
       successful.forEach(p => {
         const dName = p.device?.name || 'unknown';
@@ -199,14 +200,15 @@ const server = http.createServer((req, res) => {
     const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
     fetchAllPayments(startMs, endMs, (err, payments) => {
       if (err) { json({error: err.message}, 500); return; }
-      const successful = payments.filter(p => p.result === 'SUCCESS');
+      // Include all non-voided payments — refunds come as negative amounts and cancel out
+      const successful = payments.filter(p => p.result === 'SUCCESS' || p.result === 'REFUND');
       let cash=0, credit=0, debit=0, ebt=0, tax=0, kitchen=0, total=0;
       successful.forEach(p => {
         const amt = (p.amount || 0) / 100;
         const taxAmt = (p.taxAmount || 0) / 100;
         const tender = (p.tender?.label || '').toLowerCase();
         const tenderKey = (p.tender?.labelKey || '').toLowerCase();
-        tax += taxAmt; total += amt;
+        tax += Math.round(taxAmt * 100) / 100; total += amt;
         if (tenderKey.includes('cash') || tender.includes('cash')) cash += amt;
         else if (tenderKey.includes('debit') || tender.includes('debit')) debit += amt;
         else if (tenderKey.includes('credit') || tender.includes('credit')) credit += amt;
