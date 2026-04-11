@@ -347,6 +347,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
       </div>
 
+      <!-- CASH SHORT/OVER -->
+      <div id="cash-variance-bar" style="display:none;padding:10px 14px;border-radius:var(--r);margin-bottom:12px;border:0.5px solid;display:flex;align-items:center;justify-content:space-between">
+        <span style="font-size:13px;font-weight:500" id="cash-variance-label"></span>
+        <span style="font-family:var(--mono);font-size:16px;font-weight:600" id="cash-variance-val"></span>
+      </div>
+
       <!-- MONEY TRANSFER -->
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
@@ -356,22 +362,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <div class="card-chevron">▼</div>
         </div>
         <div class="card-body">
-          <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">Moneygram</div>
+          <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">Ria Money Transfer</div>
           <div class="form-grid fg-2">
-            <div class="fgroup"><label>Daily Transactions ($)</label><div class="dollar"><input type="number" id="mg-txn" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
-            <div class="fgroup"><label>Daily Deposit ($)</label><div class="dollar"><input type="number" id="mg-dep" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
+            <div class="fgroup"><label>Cash</label><div class="dollar"><input type="number" id="mg-txn" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
+            <div class="fgroup"><label>Debit</label><div class="dollar"><input type="number" id="mg-dep" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
           </div>
           <div class="divider"></div>
-          <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">BOSS Revolution</div>
-          <div class="form-grid fg-2">
-            <div class="fgroup"><label>Daily Transactions ($)</label><div class="dollar"><input type="number" id="br-txn" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
-            <div class="fgroup"><label>Daily Deposit ($)</label><div class="dollar"><input type="number" id="br-dep" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
-          </div>
-          <div class="divider"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Combined Deposits</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <span style="font-size:13px;color:var(--muted);font-weight:500">Total Cash Deposit</span>
             <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--blue)" id="total-transfer">$0.00</span>
           </div>
+          <div style="font-size:11px;color:var(--hint)">Cash field amount goes to bank deposit</div>
         </div>
       </div>
 
@@ -392,9 +393,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
             <div class="fgroup"><label>Other Cash</label><div class="dollar"><input type="number" id="d-other" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
           </div>
           <div class="divider"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Total Deposit</span>
-            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-deposit">$0.00</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-l);border-radius:7px;padding:10px 12px;margin-top:4px">
+            <span style="font-size:14px;color:var(--green);font-weight:700">Total Bank Deposit Today</span>
+            <span style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--green)" id="total-deposit">$0.00</span>
           </div>
         </div>
       </div>
@@ -723,6 +724,11 @@ function login(role) {
   document.getElementById('app').style.display = 'flex';
   buildNav();
   init();
+  // Owner lands on dashboard, staff lands on daily report
+  if(role === 'owner') {
+    const dashBtn = document.querySelector('.nav-btn.owner-only');
+    if(dashBtn) showPage('dashboard', dashBtn);
+  }
 }
 function logout() {
   userRole = null;
@@ -962,6 +968,7 @@ function calcSales() {
   const net = gross - getVal('s-tax');
   document.getElementById('total-sales').textContent = fmtMoney(net);
   document.getElementById('badge-sales').textContent = fmtMoney(net);
+  calcCashVariance();
 }
 function calcKitchen() {
   const gross = getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt');
@@ -975,6 +982,38 @@ function calcPayouts() {
   const t = cashTotal+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
   document.getElementById('total-payouts').textContent = fmtMoney(t);
   document.getElementById('badge-payouts').textContent = fmtMoney(t);
+  calcCashVariance();
+}
+function calcCashVariance() {
+  const posCash = getVal('s-cash');
+  const cashRows = [...document.querySelectorAll('.payout-amt')];
+  const cashPayout = cashRows.reduce((s,el) => s + (parseFloat(el.value)||0), 0);
+  const otherPayouts = getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
+  const variance = posCash - cashPayout - otherPayouts;
+  const bar = document.getElementById('cash-variance-bar');
+  const label = document.getElementById('cash-variance-label');
+  const val = document.getElementById('cash-variance-val');
+  if(!bar) return;
+  if(Math.abs(variance) < 0.01) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+  if(variance > 0) {
+    bar.style.background = 'var(--green-l)';
+    bar.style.borderColor = 'var(--green-m)';
+    label.style.color = 'var(--green)';
+    val.style.color = 'var(--green)';
+    label.textContent = 'Cash Over';
+    val.textContent = '+' + fmtMoney(variance);
+  } else {
+    bar.style.background = 'var(--red-l)';
+    bar.style.borderColor = '#f09595';
+    label.style.color = 'var(--red)';
+    val.style.color = 'var(--red)';
+    label.textContent = 'Cash Short';
+    val.textContent = '-' + fmtMoney(Math.abs(variance));
+  }
 }
 function addCashPayoutRow() {
   const row = document.createElement('div');
@@ -998,7 +1037,7 @@ function removeCashPayout(btn) {
   calcPayouts();
 }
 function calcTransfer() {
-  const t = getVal('mg-dep')+getVal('br-dep');
+  const t = getVal('mg-txn'); // Cash field is the deposit
   document.getElementById('total-transfer').textContent = fmtMoney(t);
   document.getElementById('badge-transfer').textContent = fmtMoney(t);
 }
