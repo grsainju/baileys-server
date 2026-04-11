@@ -1,3001 +1,502 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bailey's Market — Operations</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --green:#1a5c3a;--green-d:#134530;--green-l:#e8f4ed;--green-m:#b8dfc8;
-  --amber:#c8780a;--amber-l:#fef3e2;
-  --red:#b83232;--red-l:#fdeaea;
-  --blue:#1a4a8a;--blue-l:#eaf0fb;
-  --bg:#f5f4f0;--surface:#ffffff;--surface2:#fafaf7;
-  --border:#e2e0d8;--border2:#ccc9be;
-  --text:#1c1b18;--muted:#6b6860;--hint:#9b9890;
-  --font:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace;
-  --r:10px;--r2:7px
-}
+const https = require('https');
+const http = require('http');
+const url = require('url');
+const fs = require('fs');
+const path = require('path');
 
-body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;font-size:15px}
-
-/* AUTH */
-#auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--green);padding:20px}
-.auth-box{background:white;border-radius:16px;padding:40px;width:100%;max-width:380px;text-align:center}
-.auth-logo{width:56px;height:56px;background:var(--green);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:24px}
-.auth-title{font-size:22px;font-weight:600;color:var(--text);margin-bottom:6px}
-.auth-sub{font-size:13px;color:var(--muted);margin-bottom:28px}
-.auth-options{display:flex;flex-direction:column;gap:10px}
-.auth-btn{padding:12px;border-radius:8px;border:1.5px solid var(--border2);font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.15s}
-.auth-btn.owner{background:var(--green);color:white;border-color:var(--green)}
-.auth-btn.owner:hover{background:var(--green-d)}
-.auth-btn.staff{background:white;color:var(--text)}
-.auth-btn.staff:hover{background:var(--surface2)}
-.auth-hint{font-size:12px;color:var(--hint);margin-top:16px}
-
-/* LAYOUT */
-#app{display:none;flex-direction:column;min-height:100vh}
-.topbar{background:var(--green);height:54px;display:flex;align-items:center;padding:0 16px;gap:12px;position:sticky;top:0;z-index:200}
-.topbar-brand{color:white;font-weight:600;font-size:15px;margin-right:8px}
-.topbar-brand em{font-style:normal;opacity:0.55;font-weight:400;font-size:13px;margin-left:4px}
-.nav-scroll{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
-.nav-scroll::-webkit-scrollbar{display:none}
-.nav-btn{background:none;border:none;color:rgba(255,255,255,0.6);padding:6px 11px;border-radius:6px;cursor:pointer;font-family:var(--font);font-size:13px;white-space:nowrap;transition:all 0.15s;font-weight:400}
-.nav-btn:hover{color:white;background:rgba(255,255,255,0.1)}
-.nav-btn.active{color:white;background:rgba(255,255,255,0.18);font-weight:500}
-.nav-btn.owner-only{color:rgba(255,220,100,0.7)}
-.nav-btn.owner-only.active{color:#ffd864;background:rgba(255,216,100,0.15)}
-.topbar-user{margin-left:auto;color:rgba(255,255,255,0.5);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:5px;white-space:nowrap}
-.topbar-user:hover{color:white;background:rgba(255,255,255,0.1)}
-
-.content{flex:1;padding:18px 16px;max-width:860px;margin:0 auto;width:100%}
-.page{display:none}.page.active{display:block}
-
-/* PAGE HEADER */
-.page-header{margin-bottom:18px}
-.page-title{font-size:20px;font-weight:600}
-.page-sub{font-size:13px;color:var(--muted);margin-top:3px}
-
-/* CARDS */
-.card{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
-.card-head{padding:11px 15px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:9px;background:var(--surface2);cursor:pointer;user-select:none}
-.card-head:hover{background:#f3f2ee}
-.card-icon{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
-.card-title{font-size:13px;font-weight:600;flex:1;letter-spacing:0.1px}
-.card-badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500}
-.card-chevron{color:var(--hint);font-size:11px;transition:transform 0.2s}
-.card-chevron.open{transform:rotate(180deg)}
-.card-body{padding:15px;display:none}
-.card-body.open{display:block}
-
-/* DATE BAR */
-.date-bar{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:12px 15px;margin-bottom:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.date-bar label{font-size:12px;color:var(--muted);font-weight:500}
-.date-bar input{font-family:var(--font);font-size:14px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:6px;color:var(--text);background:white;outline:none}
-.date-bar input:focus{border-color:var(--green)}
-.clover-btn{margin-left:auto;background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:6px 13px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;display:flex;align-items:center;gap:6px}
-.clover-btn:hover{background:var(--green-m)}
-.clover-btn.loading{opacity:0.6;cursor:wait}
-
-/* FORM */
-.form-grid{display:grid;gap:10px;margin-bottom:12px}
-.fg-2{grid-template-columns:1fr 1fr}
-.fg-3{grid-template-columns:1fr 1fr 1fr}
-.fg-4{grid-template-columns:1fr 1fr 1fr 1fr}
-.fgroup{display:flex;flex-direction:column;gap:4px}
-.fgroup label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0.3px;text-transform:uppercase}
-.fgroup input,.fgroup select{font-family:var(--font);font-size:14px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:var(--r2);background:white;color:var(--text);outline:none;width:100%;transition:border-color 0.15s}
-.fgroup input:focus,.fgroup select:focus{border-color:var(--green);box-shadow:0 0 0 3px rgba(26,92,58,0.08)}
-.fgroup input[type=number]{font-family:var(--mono);text-align:right}
-.dollar{position:relative}
-.dollar::before{content:'$';position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--hint);font-size:13px;font-family:var(--mono);z-index:1}
-.dollar input{padding-left:22px}
-.divider{height:0.5px;background:var(--border);margin:14px 0}
-
-/* MACHINE GRID */
-.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.mcard{border:0.5px solid var(--border);border-radius:8px;padding:12px;background:var(--surface2)}
-.mcard-label{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:9px}
-.mcard-inputs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.mcard-net{margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
-.mcard-net span{font-size:11px;color:var(--muted)}
-.mcard-net strong{font-family:var(--mono);font-size:13px;font-weight:500;color:var(--green)}
-.machine-total{background:var(--green-l);border:0.5px solid var(--green-m);border-radius:8px;padding:12px 15px;margin-top:12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
-.mt-item{text-align:center}
-.mt-label{font-size:11px;color:var(--muted);margin-bottom:3px}
-.mt-val{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--green)}
-
-/* INVOICE TABLE */
-.inv-table{width:100%;border-collapse:collapse;font-size:13px}
-.inv-table th{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;padding:6px 8px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface2)}
-.inv-table td{padding:8px 8px;border-bottom:0.5px solid var(--border);vertical-align:middle}
-.inv-table tr:last-child td{border-bottom:none}
-.inv-table tr:hover td{background:var(--surface2)}
-.inv-table input,.inv-table select{font-family:var(--font);font-size:13px;padding:5px 7px;border:0.5px solid var(--border2);border-radius:5px;background:white;width:100%;outline:none}
-.inv-table input:focus,.inv-table select:focus{border-color:var(--green)}
-.status-badge{font-size:11px;padding:3px 9px;border-radius:20px;font-weight:500;white-space:nowrap}
-.badge-paid{background:#e8f4ed;color:#1a5c3a}
-.badge-unpaid{background:#fef3e2;color:#c8780a}
-.badge-partial{background:#eaf0fb;color:#1a4a8a}
-.add-row-btn{background:none;border:0.5px dashed var(--border2);color:var(--muted);padding:7px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer;width:100%;margin-top:8px;transition:all 0.15s}
-.add-row-btn:hover{border-color:var(--green);color:var(--green);background:var(--green-l)}
-
-/* SUBMIT */
-.submit-bar{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-top:6px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.submit-btn{background:var(--green);color:white;border:none;padding:10px 24px;border-radius:8px;font-family:var(--font);font-size:14px;font-weight:600;cursor:pointer;transition:all 0.15s}
-.submit-btn:hover{background:var(--green-d)}
-.submit-btn:active{transform:scale(0.98)}
-.save-note{font-size:12px;color:var(--muted)}
-.save-success{color:var(--green);font-size:13px;font-weight:500;display:none}
-
-/* DASHBOARD */
-.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
-.dash-grid.four{grid-template-columns:1fr 1fr 1fr 1fr}
-.metric{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px}
-.metric-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px}
-.metric-val{font-size:26px;font-weight:600;font-family:var(--mono);color:var(--text);line-height:1}
-.metric-val.green{color:var(--green)}
-.metric-val.amber{color:var(--amber)}
-.metric-sub{font-size:11px;color:var(--hint);margin-top:5px}
-.chart-bar-wrap{background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-bottom:12px}
-.chart-title{font-size:13px;font-weight:600;margin-bottom:14px}
-.bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.bar-label{font-size:12px;color:var(--muted);width:80px;flex-shrink:0}
-.bar-track{flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden}
-.bar-fill{height:100%;border-radius:4px;transition:width 0.5s ease}
-.bar-val{font-family:var(--mono);font-size:12px;color:var(--text);width:72px;text-align:right;flex-shrink:0}
-
-/* WEEKLY REPORT */
-.report-table{width:100%;border-collapse:collapse;font-size:13px}
-.report-table th{background:var(--green);color:white;padding:9px 12px;font-size:12px;font-weight:500;text-align:left}
-.report-table td{padding:9px 12px;border-bottom:0.5px solid var(--border)}
-.report-table tr:last-child td{border-bottom:none;font-weight:600;background:var(--green-l)}
-.report-table tr:hover:not(:last-child) td{background:var(--surface2)}
-.num{font-family:var(--mono);text-align:right}
-
-/* PRICE MANAGER */
-.search-bar{display:flex;gap:8px;margin-bottom:14px}
-.search-bar input{flex:1;font-family:var(--font);font-size:14px;padding:9px 12px;border:0.5px solid var(--border2);border-radius:8px;background:white;outline:none}
-.search-bar input:focus{border-color:var(--green)}
-.search-bar button{background:var(--green);color:white;border:none;padding:9px 18px;border-radius:8px;font-family:var(--font);font-size:14px;cursor:pointer}
-.item-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border-bottom:0.5px solid var(--border);transition:background 0.1s}
-.item-row:hover{background:var(--surface2)}
-.item-name{flex:1;font-size:14px}
-.item-sku{font-size:11px;color:var(--hint);font-family:var(--mono)}
-.item-price{font-family:var(--mono);font-size:14px;width:90px;text-align:right}
-.item-price input{font-family:var(--mono);font-size:14px;padding:5px 8px;border:0.5px solid var(--border2);border-radius:5px;width:90px;text-align:right;outline:none}
-.item-price input:focus{border-color:var(--green)}
-.item-save{background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:5px 12px;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;font-family:var(--font)}
-.item-save:hover{background:var(--green-m)}
-.item-saved{color:var(--green);font-size:12px;font-weight:500}
-
-/* HISTORY */
-.history-item{padding:12px 15px;border-bottom:0.5px solid var(--border);display:flex;align-items:flex-start;gap:12px}
-.history-item:last-child{border-bottom:none}
-.history-date{font-size:12px;color:var(--muted);font-family:var(--mono);width:80px;flex-shrink:0;padding-top:2px}
-.history-content{flex:1}
-.history-title{font-size:13px;font-weight:500;margin-bottom:3px}
-.history-detail{font-size:12px;color:var(--muted)}
-.history-amt{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--green)}
-
-/* CATEGORY TRACKER */
-.cat-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)}
-.cat-row:last-child{border-bottom:none}
-.cat-name{font-size:13px;font-weight:500}
-.cat-actual{font-family:var(--mono);font-size:13px;color:var(--green)}
-.cat-proj{font-family:var(--mono);font-size:13px;color:var(--amber)}
-.cat-trend{font-size:11px;color:var(--muted)}
-
-/* UTIL */
-.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
-.tag-green{background:var(--green-l);color:var(--green)}
-.tag-amber{background:var(--amber-l);color:var(--amber)}
-.tag-red{background:var(--red-l);color:var(--red)}
-.tag-blue{background:var(--blue-l);color:var(--blue)}
-.toast{position:fixed;bottom:20px;right:20px;background:var(--green);color:white;padding:12px 18px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;display:none;box-shadow:0 4px 16px rgba(0,0,0,0.15)}
-.toast.show{display:block;animation:toastin 0.2s ease}
-@keyframes toastin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:13px}
-.empty-state div{font-size:28px;margin-bottom:8px}
-.section-note{font-size:12px;color:var(--hint);margin-top:4px}
-.clover-status{font-size:12px;padding:4px 10px;border-radius:20px;font-weight:500}
-.clover-ok{background:var(--green-l);color:var(--green)}
-.clover-err{background:var(--red-l);color:var(--red)}
-
-@media(max-width:600px){
-  .fg-2,.fg-3,.fg-4{grid-template-columns:1fr 1fr}
-  .fg-4{grid-template-columns:1fr 1fr}
-  .dash-grid.four{grid-template-columns:1fr 1fr}
-  .mgrid{grid-template-columns:1fr 1fr}
-  .machine-total{grid-template-columns:1fr 1fr 1fr}
-}
-@media(max-width:400px){
-  .fg-3,.fg-4,.mgrid{grid-template-columns:1fr}
-  .machine-total{grid-template-columns:1fr 1fr}
-}
-
-.paytype-btn{font-family:var(--font);font-size:13px;padding:10px 8px;border:1.5px solid var(--border2);border-radius:8px;background:white;cursor:pointer;transition:all 0.15s;font-weight:500}
-.paytype-btn:hover{border-color:var(--green);background:var(--green-l);color:var(--green)}
-.paytype-btn.selected{border-color:var(--green);background:var(--green);color:white}
-</style>
-</head>
-<body>
-
-<!-- AUTH -->
-<div id="auth-screen">
-  <div class="auth-box">
-    <div class="auth-logo">🏪</div>
-    <div class="auth-title">Bailey's Market</div>
-    <div class="auth-sub">Operations & Reporting System</div>
-    <div class="auth-options">
-      <button class="auth-btn owner" onclick="login('owner')">Owner / Manager Login</button>
-      <button class="auth-btn staff" onclick="login('staff')">Staff Daily Entry</button>
-    </div>
-    <div class="auth-hint">Select your role to continue</div>
-  </div>
-</div>
-
-<!-- MAIN APP -->
-<div id="app">
-  <div class="topbar">
-    <div class="topbar-brand">Bailey's Market <em>Operations</em></div>
-    <div class="nav-scroll" id="nav-tabs"></div>
-    <div class="topbar-user" onclick="logout()">🔓 Sign out</div>
-  </div>
-  <div class="content">
-    <!-- DAILY REPORT PAGE -->
-    <div class="page active" id="page-daily">
-      <div class="page-header">
-        <div class="page-title">Daily Report</div>
-        <div class="page-sub">Enter today's sales, payouts, and cash activity</div>
-      </div>
-
-      <div class="date-bar">
-        <label>Report Date</label>
-        <input type="date" id="report-date" onchange="checkExistingReport()">
-        <span id="report-exists-badge" style="display:none;font-size:12px;padding:4px 10px;background:var(--green-l);color:var(--green);border-radius:20px;font-weight:500"></span>
-        <div class="clover-btn" onclick="parseCloverCSV()" id="clover-pull-btn">
-          <span>↓</span> Pull from Clover
-        </div>
-        <span id="clover-status" class="clover-status" style="display:none"></span>
-      </div>
-
-      <!-- SALES -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#e8f4ed">💰</div>
-          <div class="card-title">All POS Sales <span id="store-open-note" style="display:none;font-size:11px;color:#b8600a;font-weight:400">⚠ Store may still be open — numbers not final</span></div>
-          <div class="card-badge tag tag-green" id="badge-sales">$0.00</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open">
-          <div class="form-grid fg-3">
-            <div class="fgroup"><label>Cash Sales</label><div class="dollar"><input type="number" id="s-cash" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
-            <div class="fgroup"><label>Credit Card</label><div class="dollar"><input type="number" id="s-credit" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
-            <div class="fgroup"><label>Debit Card</label><div class="dollar"><input type="number" id="s-debit" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
-            <div class="fgroup"><label>EBT / Food Stamp</label><div class="dollar"><input type="number" id="s-ebt" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
-            <div class="fgroup"><label>Tax Collected</label><div class="dollar"><input type="number" id="s-tax" step="0.01" placeholder="0.00" oninput="calcSales()"></div></div>
-          </div>
-          <div class="divider"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Net Sales</span>
-            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-sales">$0.00</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- KITCHEN POS -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#e8f4ed">🍳</div>
-          <div class="card-title">Kitchen POS Sales</div>
-          <div class="card-badge tag tag-green" id="badge-kitchen">$0.00</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:12px">Sales from Kitchen register only — auto-filled when you Pull from Clover</div>
-          <div class="form-grid fg-3">
-            <div class="fgroup"><label>Cash Sales</label><div class="dollar"><input type="number" id="k-cash" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
-            <div class="fgroup"><label>Credit Card</label><div class="dollar"><input type="number" id="k-credit" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
-            <div class="fgroup"><label>Debit Card</label><div class="dollar"><input type="number" id="k-debit" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
-            <div class="fgroup"><label>EBT / Food Stamp</label><div class="dollar"><input type="number" id="k-ebt" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
-            <div class="fgroup"><label>Tax Collected</label><div class="dollar"><input type="number" id="k-tax" step="0.01" placeholder="0.00" oninput="calcKitchen()"></div></div>
-          </div>
-          <div class="divider"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Kitchen Net Sales</span>
-            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)" id="total-kitchen">$0.00</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- PAYOUTS -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#fef3e2">📤</div>
-          <div class="card-title">Payouts & Cash Out</div>
-          <div class="card-badge tag tag-amber" id="badge-payouts">$0.00</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body">
-          <!-- Always visible: Lottery Payout + Missing/Extra -->
-          <div class="form-grid fg-2" style="margin-bottom:12px">
-            <div class="fgroup"><label>Lottery Payout</label><div class="dollar"><input type="number" id="p-lottery" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
-            <div class="fgroup"><label>Missing / Extra</label><div class="dollar"><input type="number" id="p-misc" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
-          </div>
-
-          <!-- Hidden fields - shown when added -->
-          <div id="p-game-row" style="display:none;margin-bottom:10px">
-            <div style="display:flex;align-items:flex-end;gap:8px">
-              <div class="fgroup" style="flex:1"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="p-game" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
-              <button onclick="removeOptionalPayout('p-game-row','p-game')" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
-            </div>
-          </div>
-          <div id="p-lotref-row" style="display:none;margin-bottom:10px">
-            <div style="display:flex;align-items:flex-end;gap:8px">
-              <div class="fgroup" style="flex:1"><label>Lottery Refund</label><div class="dollar"><input type="number" id="p-lotref" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
-              <button onclick="removeOptionalPayout('p-lotref-row','p-lotref')" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
-            </div>
-          </div>
-          <div id="p-atm-row" style="display:none;margin-bottom:10px">
-            <div style="display:flex;align-items:flex-end;gap:8px">
-              <div class="fgroup" style="flex:1"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="p-atm" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
-              <button onclick="removeOptionalPayout('p-atm-row','p-atm')" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
-            </div>
-          </div>
-
-          <!-- Cash Payout rows (multiple) -->
-          <div id="cash-payout-rows" style="margin-bottom:4px"></div>
-
-          <!-- Add buttons -->
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
-            <button onclick="addCashPayoutRow()" class="add-row-btn" style="flex:1;min-width:140px">+ Cash Payout</button>
-            <button onclick="showOptionalPayout('p-game-row')" id="btn-p-game" class="add-row-btn" style="flex:1;min-width:140px">+ Game Machine Winner</button>
-            <button onclick="showOptionalPayout('p-lotref-row')" id="btn-p-lotref" class="add-row-btn" style="flex:1;min-width:140px">+ Lottery Refund</button>
-            <button onclick="showOptionalPayout('p-atm-row')" id="btn-p-atm" class="add-row-btn" style="flex:1;min-width:140px">+ ATM Balance Add</button>
-          </div>
-
-          <div class="divider"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Total Payouts</span>
-            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--amber)" id="total-payouts">$0.00</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- MONEY TRANSFER -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#eaf0fb">💸</div>
-          <div class="card-title">Money Transfer Services</div>
-          <div class="card-badge tag tag-blue" id="badge-transfer">$0.00</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body">
-          <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">Ria Money Transfer</div>
-          <div class="form-grid fg-2">
-            <div class="fgroup"><label>Cash</label><div class="dollar"><input type="number" id="mg-txn" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
-            <div class="fgroup"><label>Debit</label><div class="dollar"><input type="number" id="mg-dep" step="0.01" placeholder="0.00" oninput="calcTransfer()"></div></div>
-          </div>
-          <div class="divider"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <span style="font-size:13px;color:var(--muted);font-weight:500">Total Cash Deposit</span>
-            <span style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--blue)" id="total-transfer">$0.00</span>
-          </div>
-          <div style="font-size:11px;color:var(--hint)">Cash field amount goes to bank deposit</div>
-        </div>
-      </div>
-
-      <!-- CASH DEPOSIT -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#e8f4ed">🏦</div>
-          <div class="card-title">Cash Collected / Bank Deposit</div>
-          <div class="card-badge tag tag-green" id="badge-deposit">$0.00</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body">
-          <div class="form-grid fg-3">
-            <div class="fgroup"><label>POS Cash</label><div class="dollar"><input type="number" id="d-pos" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
-            <div class="fgroup"><label>Lottery Kiosk Cash</label><div class="dollar"><input type="number" id="d-lottery" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
-            <div class="fgroup"><label>Toy Machine Commission</label><div class="dollar"><input type="number" id="d-toy" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
-            <div class="fgroup"><label>Coin Game Commission</label><div class="dollar"><input type="number" id="d-coin" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
-            <div class="fgroup"><label>Other Cash</label><div class="dollar"><input type="number" id="d-other" step="0.01" placeholder="0.00" oninput="calcDeposit()"></div></div>
-          </div>
-          <div class="divider"></div>
-          <div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-l);border-radius:7px;padding:10px 12px;margin-top:4px">
-            <span style="font-size:14px;color:var(--green);font-weight:700">Total Bank Deposit Today</span>
-            <span style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--green)" id="total-deposit">$0.00</span>
-          </div>
-          <!-- CASH SHORT/OVER - shown below bank deposit -->
-          <div id="cash-variance-bar" style="display:none;margin-top:10px;padding:10px 12px;border-radius:7px;border:0.5px solid;align-items:center;justify-content:space-between">
-            <span style="font-size:13px;font-weight:600" id="cash-variance-label"></span>
-            <span style="font-family:var(--mono);font-size:16px;font-weight:700" id="cash-variance-val"></span>
-          </div>
-        </div>
-      </div>
-
-      <!-- NOTES -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#f1efea">📝</div>
-          <div class="card-title">Notes</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body">
-          <textarea id="daily-notes" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border:0.5px solid var(--border2);border-radius:7px;resize:vertical;outline:none" placeholder="Any notes for today..."></textarea>
-        </div>
-      </div>
-
-      <!-- CATEGORY SALES -->
-      <div class="card" id="category-sales-card" style="display:none">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#eaf0fb">📊</div>
-          <div class="card-title">Sales by Category</div>
-          <div class="card-badge tag tag-blue" id="badge-categories">—</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body" id="category-sales-body">
-          <div class="empty-state"><div>📊</div>Pull from Clover to see category breakdown</div>
-        </div>
-      </div>
-
-      <div class="submit-bar">
-        <button class="submit-btn" onclick="showSaveConfirm()">Save Daily Report</button>
-        <span class="save-note">All fields are optional — save what you have</span>
-        <span class="save-success" id="daily-saved">✓ Saved successfully</span>
-      </div>
-    </div>
-
-    <!-- GAME MACHINES PAGE -->
-    <div class="page" id="page-machines">
-      <div class="page-header">
-        <div class="page-title">Game Machines</div>
-        <div class="page-sub">Enter Total In and Total Out from each machine's printed report. The app calculates how much to take out today.</div>
-      </div>
-      <div class="date-bar">
-        <label>Report Date</label>
-        <input type="date" id="machine-date" onchange="loadPrevMachineData()">
-      </div>
-
-      <!-- MACHINE GRID -->
-      <div class="mgrid" id="machine-grid"></div>
-
-      <!-- SUMMARY -->
-      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-top:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:12px">Today's Summary</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:14px">
-          <div class="metric"><div class="metric-label">Total Take Out</div><div class="metric-val green" id="mt-takeout">$0.00</div><div class="metric-sub">Cash to collect today</div></div>
-          <div class="metric"><div class="metric-label">Combined Net</div><div class="metric-val" id="mt-net">$0.00</div><div class="metric-sub">All machines cumulative</div></div>
-          <div class="metric"><div class="metric-label">Vendor Pay (40%)</div><div class="metric-val amber" id="mt-vendor">$0.00</div><div class="metric-sub">Of total take out</div></div>
-          <div class="metric"><div class="metric-label">Our Income (60%)</div><div class="metric-val green" id="mt-store">$0.00</div><div class="metric-sub">Of total take out</div></div>
-        </div>
-
-        <!-- Per machine take out table -->
-        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Take Out Per Machine</div>
-        <div id="machine-takeout-table" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px">
-        </div>
-      </div>
-
-      <div class="submit-bar" style="margin-top:12px">
-        <button class="submit-btn" onclick="saveMachines()">Save Machine Report</button>
-        <button onclick="resetMachines()" style="background:none;border:0.5px solid var(--border2);padding:10px 16px;border-radius:8px;font-family:var(--font);font-size:14px;cursor:pointer;color:var(--muted)">Reset All Machines</button>
-        <span class="save-success" id="machine-saved">✓ Saved</span>
-      </div>
-    </div>
-
-    <!-- INVOICES PAGE -->
-    <div class="page" id="page-invoices">
-      <div class="page-header">
-        <div class="page-title">Invoice Tracker</div>
-        <div class="page-sub">Enter invoices when received. Update payment status when paid.</div>
-      </div>
-
-      <!-- INVOICE SEARCH BAR -->
-      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:12px 15px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <input type="text" id="inv-search" placeholder="Search by vendor, invoice #, or amount..." style="flex:1;min-width:180px;font-family:var(--font);font-size:14px;padding:8px 12px;border:0.5px solid var(--border2);border-radius:7px;outline:none" oninput="filterInvoices()">
-        <select id="inv-filter-status" style="font-family:var(--font);font-size:13px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white" onchange="filterInvoices()">
-          <option value="all">All Invoices</option>
-          <option value="unpaid">Unpaid Only</option>
-          <option value="paid">Paid Only</option>
-        </select>
-        <button onclick="clearInvSearch()" style="background:none;border:0.5px solid var(--border2);padding:8px 12px;border-radius:7px;font-family:var(--font);font-size:13px;color:var(--muted);cursor:pointer">Clear</button>
-        <button onclick="exportInvoicesCSV()" style="background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:8px 14px;border-radius:7px;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer">⬇ Export CSV</button>
-      </div>
-
-      <!-- SEARCH RESULTS (shown when searching) -->
-      <div id="inv-search-results" style="display:none">
-        <div class="card">
-          <div class="card-head" style="cursor:default;background:var(--info-light,#eaf0fb)">
-            <div class="card-icon" style="background:#eaf0fb">🔍</div>
-            <div class="card-title" id="inv-search-title">Search Results</div>
-            <div class="card-badge tag tag-blue" id="inv-search-count">0</div>
-          </div>
-          <div class="card-body open" id="inv-search-list"></div>
-        </div>
-      </div>
-
-      <div style="margin-bottom:12px">
-        <button class="submit-btn" onclick="openAddInvoiceModal()" style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:16px">+</span> Add New Invoice
-        </button>
-      </div>
-
-      <!-- UNPAID -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#fef3e2">⏳</div>
-          <div class="card-title">Unpaid Invoices</div>
-          <div class="card-badge tag tag-amber" id="badge-unpaid">0</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open" id="unpaid-list">
-          <div class="empty-state"><div>📄</div>No unpaid invoices</div>
-        </div>
-      </div>
-
-      <!-- ALL INVOICES -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#e8f4ed">📋</div>
-          <div class="card-title">All Invoices</div>
-          <div class="card-chevron">▼</div>
-        </div>
-        <div class="card-body" id="all-invoices-list">
-          <div class="empty-state"><div>📋</div>No invoices yet</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- DASHBOARD PAGE (OWNER) -->
-    <div class="page" id="page-dashboard">
-      <div class="page-header">
-        <div class="page-title">Dashboard</div>
-        <div class="page-sub">Bailey's Market — Live snapshot &amp; monthly summary</div>
-      </div>
-
-      <!-- SECTION 1: DAILY SNAPSHOT -->
-      <div style="background:var(--green);border-radius:var(--r);padding:15px;margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
-          <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.4px">Daily Snapshot</div>
-          <input type="date" id="ls-date-picker" onchange="loadDailySnapshot()" style="font-family:var(--font);font-size:13px;padding:5px 10px;border:none;border-radius:6px;background:rgba(255,255,255,0.15);color:white;outline:none;cursor:pointer">
-        </div>
-        <div style="font-size:13px;font-weight:500;color:rgba(255,255,255,0.7);margin-bottom:10px" id="ls-date">—</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-          <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px">
-            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px">Net Sales</div>
-            <div style="font-size:20px;font-weight:600;color:#a8e6c0;font-family:var(--mono)" id="ls-sales">$0.00</div>
-          </div>
-          <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px">
-            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px">Total Purchases</div>
-            <div style="font-size:20px;font-weight:600;color:#ffd864;font-family:var(--mono)" id="ls-purch">$0.00</div>
-          </div>
-        </div>
-        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Top 5 Categories</div>
-        <div id="ls-categories" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-          <div style="color:rgba(255,255,255,0.4);font-size:12px">No category data yet</div>
-        </div>
-      </div>
-
-      <!-- SECTION 2: MONTHLY SUMMARY -->
-      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-bottom:14px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-          <div style="font-size:13px;font-weight:600">Monthly Summary</div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <button onclick="changeMonth(-1)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--font);font-size:13px">‹</button>
-            <span style="font-size:13px;font-weight:500;min-width:90px;text-align:center" id="d-month-label">—</span>
-            <button onclick="changeMonth(1)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--font);font-size:13px">›</button>
-          </div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div class="metric"><div class="metric-label">Total Net Sales</div><div class="metric-val green" id="d-sales-mtd">$0</div><div class="metric-sub" id="d-sales-days">0 days recorded</div></div>
-          <div class="metric"><div class="metric-label">Total Purchases</div><div class="metric-val amber" id="d-purch-mtd">$0</div><div class="metric-sub">From invoices</div></div>
-          <div class="metric"><div class="metric-label">Profit Margin</div><div class="metric-val green" id="d-margin">—</div><div class="metric-sub">(Sales - Purchases) / Sales</div></div>
-          <div class="metric"><div class="metric-label">Machine Income</div><div class="metric-val green" id="d-machine-inc">$0</div><div class="metric-sub">60% of net take out</div></div>
-          <div class="metric"><div class="metric-label">Avg Daily Sale</div><div class="metric-val" id="d-avg-sale">$0</div><div class="metric-sub">Net Sales / Days recorded</div></div>
-          <div class="metric"><div class="metric-label">Avg Daily Purchase</div><div class="metric-val" id="d-avg-purch">$0</div><div class="metric-sub">Purchases / Days recorded</div></div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
-          <div class="metric"><div class="metric-label">Est. Month Sales</div><div class="metric-val" id="d-sales-est">$0</div><div class="metric-sub">Avg sale × days in month</div></div>
-          <div class="metric"><div class="metric-label">Est. Month Purchases</div><div class="metric-val" id="d-purch-est">$0</div><div class="metric-sub">Avg purchase × days in month</div></div>
-        </div>
-
-        <div style="background:var(--amber-l);border:0.5px solid #f5c26b;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-          <div>
-            <div style="font-size:12px;color:var(--amber);font-weight:600;text-transform:uppercase;letter-spacing:0.3px">Unpaid Invoices</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px" id="d-unpaid-count">0 invoices</div>
-          </div>
-          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber)" id="d-unpaid-amt">$0</div>
-        </div>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-          <div class="metric"><div class="metric-label">Total Repair Cost</div><div class="metric-val" id="d-repair-mtd">$0</div><div class="metric-sub">This month</div></div>
-          <div class="metric"><div class="metric-label">Office Supplies</div><div class="metric-val" id="d-office-mtd">$0</div><div class="metric-sub">This month</div></div>
-        </div>
-
-        <!-- Top 5 categories for the month -->
-        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Top 5 Categories This Month</div>
-        <div id="d-top-cats">
-          <div class="empty-state" style="padding:16px"><div>📊</div>No category data for this month</div>
-        </div>
-      </div>
-
-      <!-- SECTION 3: CATEGORY PROJECTIONS -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#fef3e2">📈</div>
-          <div class="card-title">Category Tracker</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open" id="cat-proj-body">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Pick up to 3 categories to track monthly net sales.</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
-            <select id="cat-pick-1" onchange="saveCatPicks()" style="flex:1;min-width:150px;font-family:var(--font);font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
-              <option value="">— Category 1 —</option>
-            </select>
-            <select id="cat-pick-2" onchange="saveCatPicks()" style="flex:1;min-width:150px;font-family:var(--font);font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
-              <option value="">— Category 2 —</option>
-            </select>
-            <select id="cat-pick-3" onchange="saveCatPicks()" style="flex:1;min-width:150px;font-family:var(--font);font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
-              <option value="">— Category 3 —</option>
-            </select>
-          </div>
-          <div id="cat-proj-results"></div>
-        </div>
-      </div>
-
-      <!-- SECTION 4: THIS WEEK -->
-      <div class="chart-bar-wrap">
-        <div class="chart-title">This Week — Daily Sales</div>
-        <div id="weekly-bars"><div class="empty-state" style="padding:20px">No data yet</div></div>
-      </div>
-
-      <!-- SECTION 5: BUSINESS INTELLIGENCE -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#f1efea">🧠</div>
-          <div class="card-title">Business Intelligence</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open" id="bi-body">
-          <div class="empty-state"><div>📊</div>Save more daily reports to unlock insights</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- WEEKLY REPORT (OWNER) -->
-    <div class="page" id="page-reports">
-      <div class="page-header">
-        <div class="page-title">Weekly Reports</div>
-        <div class="page-sub">Sales vs. purchases comparison by week</div>
-      </div>
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#e8f4ed">📊</div>
-          <div class="card-title">Sales vs. Purchases</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open" id="weekly-report-body">
-          <div class="empty-state"><div>📊</div>Enter daily reports to generate weekly comparison</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- PRICE MANAGER (OWNER) -->
-    <div class="page" id="page-prices">
-      <div class="page-header">
-        <div class="page-title">Price & Inventory Manager</div>
-        <div class="page-sub">Search items and update prices directly in Clover</div>
-      </div>
-      <div class="search-bar">
-        <input type="text" id="item-search" placeholder="Search by item name or SKU..." onkeydown="if(event.key==='Enter')searchItems()">
-        <button onclick="searchItems()">Search</button>
-      </div>
-      <div class="card" id="item-results-card" style="display:none">
-        <div class="card-body open" style="padding:0" id="item-results"></div>
-      </div>
-      <div id="price-note" style="font-size:13px;color:var(--muted);text-align:center;padding:30px">
-        Search for an item above to view and update its price in Clover
-      </div>
-    </div>
-
-    <!-- EDIT REPORTS PAGE (OWNER) -->
-    <div class="page" id="page-edit">
-      <div class="page-header">
-        <div class="page-title">Edit Reports</div>
-        <div class="page-sub">Load and modify any saved daily report, machine report, or invoice</div>
-      </div>
-
-      <!-- SELECT DATE -->
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#eaf0fb">📅</div>
-          <div class="card-title">Load Daily Report for Editing</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open">
-          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-            <div class="fgroup" style="flex:1">
-              <label>Select Date</label>
-              <input type="date" id="edit-date" style="font-family:var(--font);font-size:14px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none">
-            </div>
-            <button onclick="loadReportForEdit()" class="submit-btn" style="margin-bottom:1px">Load Report</button>
-          </div>
-          <div id="edit-status" style="margin-top:10px;font-size:13px;color:var(--muted)"></div>
-        </div>
-      </div>
-
-      <!-- EDIT FORM - shown after loading -->
-      <div id="edit-form" style="display:none">
-        <div class="card">
-          <div class="card-head" onclick="toggleCard(this)">
-            <div class="card-icon" style="background:#e8f4ed">💰</div>
-            <div class="card-title">Edit Sales</div>
-            <div class="card-chevron open">▼</div>
-          </div>
-          <div class="card-body open">
-            <div class="form-grid fg-3">
-              <div class="fgroup"><label>Cash Sales</label><div class="dollar"><input type="number" id="e-cash" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Credit Card</label><div class="dollar"><input type="number" id="e-credit" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Debit Card</label><div class="dollar"><input type="number" id="e-debit" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>EBT / Food Stamp</label><div class="dollar"><input type="number" id="e-ebt" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Tax Collected</label><div class="dollar"><input type="number" id="e-tax" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Kitchen Sales</label><div class="dollar"><input type="number" id="e-kitchen" step="0.01" placeholder="0.00"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head" onclick="toggleCard(this)">
-            <div class="card-icon" style="background:#fef3e2">📤</div>
-            <div class="card-title">Edit Payouts</div>
-            <div class="card-chevron open">▼</div>
-          </div>
-          <div class="card-body open">
-            <div class="form-grid fg-3">
-              <div class="fgroup"><label>Cash Payout</label><div class="dollar"><input type="number" id="e-pcash" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Lottery Payout</label><div class="dollar"><input type="number" id="e-lottery" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="e-game" step="0.01" min="0" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Lottery Refund</label><div class="dollar"><input type="number" id="e-lotref" step="0.01" min="0" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="e-atm" step="0.01" min="0" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Missing / Extra</label><div class="dollar"><input type="number" id="e-misc" step="0.01" placeholder="0.00"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head" onclick="toggleCard(this)">
-            <div class="card-icon" style="background:#e8f4ed">🏦</div>
-            <div class="card-title">Edit Cash Deposit</div>
-            <div class="card-chevron open">▼</div>
-          </div>
-          <div class="card-body open">
-            <div class="form-grid fg-3">
-              <div class="fgroup"><label>POS Cash</label><div class="dollar"><input type="number" id="e-pos" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Lottery Kiosk Cash</label><div class="dollar"><input type="number" id="e-dlottery" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Toy Machine Commission</label><div class="dollar"><input type="number" id="e-toy" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Coin Game Commission</label><div class="dollar"><input type="number" id="e-coin" step="0.01" placeholder="0.00"></div></div>
-              <div class="fgroup"><label>Other Cash</label><div class="dollar"><input type="number" id="e-other" step="0.01" placeholder="0.00"></div></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head" onclick="toggleCard(this)">
-            <div class="card-icon" style="background:#f1efea">📝</div>
-            <div class="card-title">Notes</div>
-            <div class="card-chevron">▼</div>
-          </div>
-          <div class="card-body">
-            <textarea id="e-notes" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border:0.5px solid var(--border2);border-radius:7px;resize:vertical;outline:none"></textarea>
-          </div>
-        </div>
-
-        <div class="submit-bar">
-          <button class="submit-btn" onclick="saveEditedReport()">Save Changes</button>
-          <span class="save-note" id="edit-date-label"></span>
-          <span class="save-success" id="edit-saved">✓ Changes saved</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- VENDOR MANAGER PAGE (OWNER) -->
-    <div class="page" id="page-vendors">
-      <div class="page-header">
-        <div class="page-title">Vendor Manager</div>
-        <div class="page-sub">Add, edit, and categorize your vendors</div>
-      </div>
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#eaf0fb">➕</div>
-          <div class="card-title">Add Vendor</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open">
-          <div class="form-grid fg-3">
-            <div class="fgroup"><label>Vendor Name</label><input type="text" id="vm-name" placeholder="e.g. Mi Mexico"></div>
-            <div class="fgroup"><label>Type / Category</label>
-              <select id="vm-type" style="font-family:var(--font);font-size:14px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white;width:100%">
-                <option value="">— Select type —</option>
-                <option value="Purchase">Purchase</option>
-                <option value="Repair">Repair</option>
-                <option value="Office Supplies">Office Supplies</option>
-                <option value="Utilities">Utilities</option>
-                <option value="Services">Services</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-            <div class="fgroup"><label>Notes</label><input type="text" id="vm-notes" placeholder="Optional notes"></div>
-          </div>
-          <button class="submit-btn" onclick="addVendor()" style="margin-top:4px">Add Vendor</button>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#e8f4ed">📋</div>
-          <div class="card-title">All Vendors</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open" id="vendor-list-body">
-          <div class="empty-state"><div>🏪</div>No vendors yet</div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-
-<!-- PAY MODAL -->
-<div id="pay-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
-  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
-    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Mark Invoice as Paid</div>
-    <div style="font-size:13px;color:#6b6860;margin-bottom:18px" id="pay-modal-vendor"></div>
-    <input type="hidden" id="pay-modal-id">
-    <div style="font-size:11px;font-weight:600;color:#6b6860;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px">Payment Method</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-      <button onclick="selectPayType('cash')" class="paytype-btn" data-type="cash">💵 Cash</button>
-      <button onclick="selectPayType('check')" class="paytype-btn" data-type="check">📝 Check</button>
-      <button onclick="selectPayType('credit')" class="paytype-btn" data-type="credit">💳 Credit Card</button>
-      <button onclick="selectPayType('ach')" class="paytype-btn" data-type="ach">🏦 ACH</button>
-    </div>
-    <div id="check-number-row" style="display:none;margin-bottom:12px">
-      <div style="font-size:11px;font-weight:600;color:#6b6860;text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px">Check Number</div>
-      <input type="text" id="check-number" placeholder="e.g. 1042" style="width:100%;font-family:inherit;font-size:14px;padding:9px 10px;border:0.5px solid #ccc9be;border-radius:7px;outline:none">
-    </div>
-    <input type="hidden" id="pay-modal-type" value="">
-    <div style="display:flex;gap:8px">
-      <button onclick="confirmMarkPaid()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Confirm Payment</button>
-      <button onclick="closePayModal()" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
-    </div>
-  </div>
-</div>
-<div class="toast" id="toast"></div>
-
-<!-- INVOICE CONFIRM MODAL -->
-<div id="inv-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:600;align-items:center;justify-content:center;padding:20px">
-  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
-    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Confirm Invoice</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Please review before saving</div>
-    <div id="inv-confirm-body" style="font-size:13px;margin-bottom:20px"></div>
-    <div style="display:flex;gap:8px">
-      <button onclick="submitConfirmedInvoice()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Save Invoice</button>
-      <button onclick="document.getElementById('inv-confirm-modal').style.display='none'" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Edit</button>
-    </div>
-  </div>
-</div>
-
-<!-- ADD / EDIT INVOICE MODAL -->
-<div id="inv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
-  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
-    <div style="font-size:15px;font-weight:600;margin-bottom:4px" id="inv-modal-title">Add Invoice</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:20px" id="inv-modal-sub">Fill in the invoice details</div>
-    <input type="hidden" id="inv-modal-id">
-
-    <div style="display:flex;flex-direction:column;gap:12px">
-      <div class="fgroup">
-        <label>Receipt Date</label>
-        <input type="date" id="inv-date" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%">
-      </div>
-      <div class="fgroup">
-        <label>Invoice Number</label>
-        <input type="text" id="inv-num" placeholder="e.g. INV-12345" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%">
-      </div>
-      <div class="fgroup">
-        <label>Vendor Name</label>
-        <div style="display:flex;gap:6px">
-          <select id="inv-vendor-select" onchange="onVendorSelect()" style="flex:1;font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
-            <option value="">— Type or select vendor —</option>
-          </select>
-          <button onclick="showNewVendorInput()" style="background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:9px 12px;border-radius:7px;font-family:var(--font);font-size:13px;cursor:pointer;white-space:nowrap">+ New</button>
-        </div>
-        <input type="text" id="inv-vendor-new" placeholder="Type new vendor name" style="display:none;margin-top:6px;font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--green);border-radius:7px;outline:none;width:100%">
-        <input type="hidden" id="inv-vendor">
-      </div>
-      <div class="fgroup">
-        <label>Amount</label>
-        <div class="dollar"><input type="number" id="inv-amount" step="0.01" placeholder="0.00" style="font-family:var(--mono);font-size:14px;padding:9px 10px 9px 22px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%;text-align:right"></div>
-      </div>
-      <div class="fgroup">
-        <label>Status</label>
-        <select id="inv-status" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white;width:100%">
-          <option value="unpaid">Unpaid</option>
-          <option value="paid">Paid</option>
-        </select>
-      </div>
-      <div class="fgroup">
-        <label>Pay Type</label>
-        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:20px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;color:var(--text);white-space:nowrap" onclick="selectInvPayType('')">
-            <input type="radio" name="inv-pt" value="" style="accent-color:var(--green)"> None
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:20px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;color:var(--text);white-space:nowrap" onclick="selectInvPayType('cash')">
-            <input type="radio" name="inv-pt" value="cash" style="accent-color:var(--green)"> Cash
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:20px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;color:var(--text);white-space:nowrap" onclick="selectInvPayType('credit')">
-            <input type="radio" name="inv-pt" value="credit" style="accent-color:var(--green)"> Credit Card
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:20px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;color:var(--text);white-space:nowrap" onclick="selectInvPayType('ach')">
-            <input type="radio" name="inv-pt" value="ach" style="accent-color:var(--green)"> ACH
-          </label>
-          <label style="display:flex;align-items:center;gap:6px;padding:6px 10px;border:0.5px solid var(--border2);border-radius:20px;cursor:pointer;text-transform:none;font-size:13px;font-weight:400;color:var(--text);white-space:nowrap" onclick="selectInvPayType('check')">
-            <input type="radio" name="inv-pt" value="check" style="accent-color:var(--green)"> Check
-          </label>
-        </div>
-        <input type="hidden" id="inv-paytype" value="">
-        <div id="inv-check-row" style="display:none;margin-top:8px">
-          <input type="text" id="inv-check-num" placeholder="Enter check number here" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--green);border-radius:7px;outline:none;width:100%">
-        </div>
-      </div>
-      <div class="fgroup">
-        <label>Notes</label>
-        <input type="text" id="inv-notes" placeholder="Optional notes" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%">
-      </div>
-    </div>
-
-    <div style="display:flex;gap:8px;margin-top:20px">
-      <button onclick="saveInvoiceModal()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer" id="inv-modal-save-btn">Save</button>
-      <button onclick="closeInvoiceModal()" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- SAVE CONFIRMATION MODAL -->
-<div id="save-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
-  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.18);max-height:90vh;overflow-y:auto">
-    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Confirm Daily Report</div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:16px" id="save-confirm-date"></div>
-    <div id="save-confirm-body" style="font-size:13px"></div>
-    <div style="display:flex;gap:8px;margin-top:20px">
-      <button onclick="proceedSaveReport()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Submit</button>
-      <button onclick="document.getElementById('save-confirm-modal').style.display='none'" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Edit</button>
-    </div>
-  </div>
-</div>
-
-<!-- OVERWRITE MODAL -->
-<div id="overwrite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
-  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
-    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Report Already Saved</div>
-    <div style="font-size:13px;color:#6b6860;margin-bottom:20px" id="overwrite-modal-msg"></div>
-    <div style="display:flex;gap:8px">
-      <button onclick="confirmOverwrite()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Overwrite</button>
-      <button onclick="document.getElementById('overwrite-modal').style.display='none'" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<!-- REVERT MODAL -->
-<div id="revert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
-  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
-    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Revert to Unpaid</div>
-    <div style="font-size:13px;color:#6b6860;margin-bottom:8px" id="revert-modal-detail"></div>
-    <div style="font-size:13px;color:var(--red);background:var(--red-l);border-radius:7px;padding:10px 12px;margin-bottom:20px">This will clear the payment date, method, and check number.</div>
-    <input type="hidden" id="revert-modal-id">
-    <div style="display:flex;gap:8px">
-      <button onclick="confirmRevert()" style="flex:1;background:var(--red);color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Yes, Revert</button>
-      <button onclick="document.getElementById('revert-modal').style.display='none'" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
-    </div>
-  </div>
-</div>
-
-<script>
 const CLOVER_TOKEN = 'cea0b142-7593-6c1e-5e79-f1ae5ddbd603';
-const MERCHANT_ID = '536927510109317';
-const API_BASE = window.location.origin + '/api';
+const MERCHANT_ID = 'J5D10DJ83FVD1';
+const PORT = process.env.PORT || 3000;
 
-let userRole = null;
-let dailyReports = [];
-let invoices = [];
-let machineReports = [];
-let specialtyCategories = [];
-const API = window.location.origin;
+// Supabase config
+const SUPABASE_URL = 'https://wntikhzvhybqhocqizuc.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndudGlraHp2aHlicWhvY3FpenVjIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTgzODgwOCwiZXhwIjoyMDkxNDE0ODA4fQ.jdW3GBVsC6pmQUWq1450W2jB1MiyJEcaMnLunHBcOic';
 
-async function apiGet(path) {
-  const res = await fetch(API + path);
-  if(!res.ok) throw new Error('API error ' + res.status);
-  return res.json();
-}
-async function apiPost(path, body) {
-  const res = await fetch(API + path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  if(!res.ok) throw new Error('API error ' + res.status);
-  return res.json();
-}
-async function apiPut(path, body) {
-  const res = await fetch(API + path, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
-  if(!res.ok) throw new Error('API error ' + res.status);
-  return res.json();
-}
-
-const STAFF_TABS = [
-  {id:'daily', label:'Daily Report'},
-  {id:'machines', label:'Game Machines'},
-  {id:'invoices', label:'Invoices'},
-];
-const OWNER_TABS = [
-  {id:'daily', label:'Daily Report'},
-  {id:'machines', label:'Game Machines'},
-  {id:'invoices', label:'Invoices'},
-  {id:'dashboard', label:'Dashboard', owner:true},
-  {id:'reports', label:'Weekly Reports', owner:true},
-  {id:'prices', label:'Price Manager', owner:true},
-  {id:'edit', label:'Edit Reports', owner:true},
-  {id:'vendors', label:'Vendor Manager', owner:true},
+const ALLOWED_ORIGINS = [
+  'https://daily.soldierfitclarksburg.com',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
 ];
 
-function login(role) {
-  userRole = role;
-  document.getElementById('auth-screen').style.display = 'none';
-  document.getElementById('app').style.display = 'flex';
-  // Reset all pages first
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  buildNav();
-  init();
-  // Route to correct first page
-  if(role === 'owner') {
-    const dashBtn = document.querySelector('.nav-btn.owner-only');
-    if(dashBtn) { showPage('dashboard', dashBtn); }
+function setCORS(req, res) {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
   } else {
-    const dailyBtn = document.querySelector('.nav-btn');
-    if(dailyBtn) { showPage('daily', dailyBtn); }
+    res.setHeader('Access-Control-Allow-Origin', ALLOWED_ORIGINS[0]);
   }
-}
-function logout() {
-  userRole = null;
-  document.getElementById('auth-screen').style.display = 'flex';
-  document.getElementById('app').style.display = 'none';
-}
-function buildNav() {
-  const tabs = userRole === 'owner' ? OWNER_TABS : STAFF_TABS;
-  const nav = document.getElementById('nav-tabs');
-  nav.innerHTML = tabs.map(t =>
-    `<button class="nav-btn${t.owner?' owner-only':''}" onclick="showPage('${t.id}',this)">${t.label}</button>`
-  ).join('');
-  nav.querySelector('.nav-btn').classList.add('active');
-}
-function showPage(id, btn) {
-  // Block staff from owner pages
-  if(userRole === 'staff' && ['dashboard','reports','prices'].includes(id)) return;
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('page-'+id).classList.add('active');
-  if(btn) btn.classList.add('active');
-  if(id==='dashboard') updateDashboard();
-  if(id==='reports') updateWeeklyReport();
-  if(id==='invoices') renderInvoices();
-  if(id==='vendors') { loadVendorData(); renderVendorList(); }
-}
-function toggleCard(head) {
-  const body = head.nextElementSibling;
-  const chev = head.querySelector('.card-chevron');
-  body.classList.toggle('open');
-  chev.classList.toggle('open');
-}
-async function init() {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const todayStr = today.toISOString().split('T')[0];
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
-  document.getElementById('report-date').value = yesterdayStr;
-  document.getElementById('machine-date').value = yesterdayStr;
-  document.getElementById('inv-date').value = todayStr;
-
-  // Load data from database
-  try {
-    const now = new Date();
-    const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
-    const [cats, invs, daily, machines] = await Promise.all([
-      apiGet('/api/categories'),
-      apiGet('/api/invoices'),
-      apiGet('/api/daily?month=' + ym),
-      apiGet('/api/machines?month=' + ym)
-    ]);
-    specialtyCategories = (cats || []).map(c => ({id: c.id, name: c.name}));
-    invoices = (invs || []).map(inv => ({
-      id: inv.id, date: inv.invoice_date, num: inv.invoice_num,
-      vendor: inv.vendor, amount: parseFloat(inv.amount),
-      status: inv.status, paytype: inv.pay_type,
-      checkNumber: inv.check_number, paidDate: inv.paid_date, notes: inv.notes
-    }));
-    dailyReports = (daily || []).map(r => ({
-      date: r.report_date,
-      sales: {cash:+r.sales_cash, credit:+r.sales_credit, debit:+r.sales_debit,
-              ebt:+r.sales_ebt, tax:+r.sales_tax, kitchen:+r.sales_kitchen, total:+r.sales_total},
-      payouts: {cash:+r.payout_cash, lottery:+r.payout_lottery, game:+r.payout_game,
-                lotteryRefund:+r.payout_lottery_refund, atm:+r.payout_atm, misc:+r.payout_misc, total:+r.payout_total},
-      transfer: {mgTxn:+r.moneygram_txn, mgDep:+r.moneygram_dep, brTxn:+r.boss_txn, brDep:+r.boss_dep},
-      deposit: {pos:+r.deposit_pos, lottery:+r.deposit_lottery, toy:+r.deposit_toy,
-                coin:+r.deposit_coin, other:+r.deposit_other, total:+r.deposit_total},
-      specialty: r.specialty || [],
-      category_sales: (r.category_sales || []),
-      notes: r.notes
-    }));
-    machineReports = (machines || []).map(r => ({
-      date: r.report_date, machines: r.machines,
-      totalNet:+r.total_net, vendorPay:+r.vendor_pay, storeIncome:+r.store_income
-    }));
-  } catch(e) {
-    console.warn('Could not load from database:', e.message);
-    console.warn('Using local data only - DB connection issue');
-  }
-
-  buildMachineGrid();
-  window._prevMachineNets = Array(8).fill(0);
-  // Load prev day data after grid is built
-  setTimeout(loadPrevMachineData, 100);
-  buildSpecialtyRows();
-  renderInvoices();
-  updateDashboard();
-  loadVendorList();
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
-// ---- CLOVER DIRECT PULL ----
-async function parseCloverCSV() {
-  const btn = document.getElementById('clover-pull-btn');
-  const status = document.getElementById('clover-status');
-  const date = document.getElementById('report-date').value;
-  if(!date) { showToast('Select a date first'); return; }
-
-  // Show inline warning if today and before 11pm
-  const _nowEST = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
-  const _todayEST = _nowEST.toISOString().split('T')[0];
-  const _note = document.getElementById('store-open-note');
-  if(_note) _note.style.display = (date === _todayEST && _nowEST.getHours() < 23) ? 'inline' : 'none';
-  btn.innerHTML = '<span>⟳</span> Pulling...';
-  btn.style.opacity = '0.7';
-  status.style.display = 'none';
-  // Clear all form fields before pulling fresh data
-  ['s-cash','s-credit','s-debit','s-ebt','s-tax','k-cash','k-credit','k-debit','k-ebt','k-tax',
-   'p-lottery','p-game','p-lotref','p-atm','p-misc',
-   'mg-txn','mg-dep','d-pos','d-lottery','d-toy','d-coin','d-other'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.value = '';
-  });
-  // Clear cash payout rows
-  document.getElementById('cash-payout-rows').innerHTML = '';
-  // Hide optional payout rows and reset their values
-  ['p-game-row','p-lotref-row','p-atm-row'].forEach(rowId => {
-    const row = document.getElementById(rowId);
-    if(row) row.style.display = 'none';
-  });
-  ['p-game','p-lotref','p-atm'].forEach(id => {
-    const el = document.getElementById(id); if(el) el.value = '';
-  });
-  ['btn-p-game','btn-p-lotref','btn-p-atm'].forEach(id => {
-    const btn = document.getElementById(id); if(btn) btn.style.display = 'block';
-  });
-  document.getElementById('daily-notes').value = '';
-  calcSales(); calcKitchen(); calcPayouts(); calcTransfer(); calcDeposit();
-  window._pulledCategories = null;
-  const catCard = document.getElementById('category-sales-card');
-  if(catCard) catCard.style.display = 'none';
-  try {
-    const res = await fetch(`${API_BASE}/summary?date=${date}`);
-    if(!res.ok) throw new Error('Server error ' + res.status);
-    const d = await res.json();
-    if(d.error) throw new Error(d.error);
-    if(d.cash   !== undefined) document.getElementById('s-cash').value   = d.cash.toFixed(2);
-    if(d.credit !== undefined) document.getElementById('s-credit').value = d.credit.toFixed(2);
-    if(d.debit  !== undefined) document.getElementById('s-debit').value  = d.debit.toFixed(2);
-    if(d.ebt    !== undefined) document.getElementById('s-ebt').value    = d.ebt.toFixed(2);
-    if(d.tax    !== undefined) document.getElementById('s-tax').value    = d.tax.toFixed(2);
-    calcSales();
-    // Kitchen breakdown
-    if(d.kitchen) {
-      if(d.kitchen.cash)   document.getElementById('k-cash').value   = d.kitchen.cash.toFixed(2);
-      if(d.kitchen.credit) document.getElementById('k-credit').value = d.kitchen.credit.toFixed(2);
-      if(d.kitchen.debit)  document.getElementById('k-debit').value  = d.kitchen.debit.toFixed(2);
-      if(d.kitchen.ebt)    document.getElementById('k-ebt').value    = d.kitchen.ebt.toFixed(2);
-      if(d.kitchen.tax)    document.getElementById('k-tax').value    = d.kitchen.tax.toFixed(2);
-      calcKitchen();
+// Supabase REST API helper
+function supabase(method, table, query, body, callback) {
+  const bodyStr = body ? JSON.stringify(body) : null;
+  const options = {
+    hostname: 'wntikhzvhybqhocqizuc.supabase.co',
+    path: `/rest/v1/${table}${query || ''}`,
+    method: method,
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'apikey': SUPABASE_KEY,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : 'return=representation'
     }
-    // Category breakdown
-    if(d.categories && d.categories.length) {
-      window._pulledCategories = d.categories;
-      renderCategorySection(d.categories, d.netSales);
-    }
-    status.textContent = `✓ ${d.count} payments pulled — Net Sales ${fmtMoney(d.netSales)}`;
-    status.className = 'clover-status clover-ok';
-    status.style.display = 'inline-block';
-    showToast('Clover data loaded — ' + d.count + ' payments');
-  } catch(e) {
-    status.textContent = '✗ Could not connect';
-    status.className = 'clover-status clover-err';
-    status.style.display = 'inline-block';
-    showToast('Pull failed: ' + e.message);
-  }
-  btn.innerHTML = '<span>↓</span> Pull from Clover';
-  btn.style.opacity = '1';
-}
-
-function parseMoney(str) {
-  if(!str) return 0;
-  const n = parseFloat(str.replace(/[$,\s]/g,''));
-  return isNaN(n) ? 0 : Math.abs(n);
-}
-
-// ---- PRICE MANAGER (via proxy server) ----
-async function searchItems() {
-  const q = document.getElementById('item-search').value.trim();
-  if(!q) return;
-  const note = document.getElementById('price-note');
-  note.style.display = 'block';
-  note.textContent = 'Searching Clover...';
-  document.getElementById('item-results-card').style.display = 'none';
-  try {
-    const res = await fetch(`${API_BASE}/items?q=${encodeURIComponent(q)}`);
-    if(!res.ok) throw new Error();
-    const data = await res.json();
-    const items = data.elements || [];
-    if(!items.length) { note.textContent = 'No items found. Try a different search term.'; return; }
-    note.style.display = 'none';
-    document.getElementById('item-results-card').style.display = 'block';
-    document.getElementById('item-results').innerHTML = items.map(item => `
-      <div class="item-row" id="row-${item.id}">
-        <div style="flex:1">
-          <div class="item-name">${item.name}</div>
-          <div class="item-sku">${item.sku || item.id.slice(0,8)}</div>
-        </div>
-        <div class="item-price">
-          <input type="number" step="0.01" value="${((item.price||0)/100).toFixed(2)}" id="price-${item.id}" onchange="markChanged('${item.id}')">
-        </div>
-        <button class="item-save" id="save-${item.id}" onclick="savePrice('${item.id}','${item.name}')">Save</button>
-      </div>
-    `).join('');
-  } catch(e) {
-    note.textContent = 'Search failed. Check connection and try again.';
-    note.style.display = 'block';
-  }
-}
-function markChanged(id) {
-  const btn = document.getElementById('save-'+id);
-  btn.style.background='var(--amber-l)'; btn.style.color='var(--amber)'; btn.textContent='Save';
-}
-async function savePrice(id, name) {
-  const input = document.getElementById('price-'+id);
-  const newPrice = parseFloat(input.value);
-  const btn = document.getElementById('save-'+id);
-  btn.textContent='Saving...'; btn.disabled=true;
-  try {
-    const res = await fetch(`${API_BASE}/items/${id}/price`, {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({price: newPrice})
-    });
-    if(!res.ok) throw new Error();
-    btn.textContent='✓ Saved'; btn.style.background='var(--green-l)'; btn.style.color='var(--green)';
-    showToast('Price updated: '+name);
-  } catch(e) {
-    btn.textContent='Failed'; btn.style.background='var(--red-l)'; btn.style.color='var(--red)';
-    showToast('Save failed — try again');
-  }
-  btn.disabled=false;
-}
-
-// ---- CALCULATIONS ----
-function fmtMoney(v) { return '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
-function fmtDate(d) {
-  if(!d) return '—';
-  const parts = d.split('-');
-  if(parts.length !== 3) return d;
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return months[parseInt(parts[1])-1] + ' ' + parseInt(parts[2]) + ', ' + parts[0];
-}
-function getVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
-
-function renderCategorySection(cats, totalNet) {
-  const card = document.getElementById('category-sales-card');
-  const body = document.getElementById('category-sales-body');
-  const badge = document.getElementById('badge-categories');
-  card.style.display = 'block';
-  badge.textContent = cats.length + ' categories';
-  const maxSale = Math.max(...cats.map(c => c.netSales));
-  body.innerHTML = `
-    <div style="display:grid;grid-template-columns:2fr 1fr 60px;gap:6px;padding:0 0 8px;border-bottom:0.5px solid var(--border);margin-bottom:8px">
-      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Category</span>
-      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">Net Sales</span>
-      <span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">% Share</span>
-    </div>
-    ${cats.map(c => {
-      const pct = totalNet > 0 ? (c.netSales/totalNet*100).toFixed(1) : 0;
-      const barW = maxSale > 0 ? Math.round(c.netSales/maxSale*100) : 0;
-      return `<div style="margin-bottom:10px">
-        <div style="display:grid;grid-template-columns:2fr 1fr 60px;gap:6px;margin-bottom:4px;align-items:center">
-          <span style="font-size:13px;font-weight:500">${c.name}</span>
-          <span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--green)">${fmtMoney(c.netSales)}</span>
-          <span style="font-size:12px;text-align:right;color:var(--muted)">${pct}%</span>
-        </div>
-        <div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">
-          <div style="width:${barW}%;height:100%;background:var(--green);border-radius:2px"></div>
-        </div>
-      </div>`;
-    }).join('')}
-    <div style="padding-top:8px;border-top:0.5px solid var(--border);display:flex;justify-content:space-between">
-      <span style="font-size:12px;color:var(--muted)">Total Net Sales</span>
-      <span style="font-family:var(--mono);font-size:13px;font-weight:600;color:var(--green)">${fmtMoney(totalNet)}</span>
-    </div>`;
-}
-
-function calcSales() {
-  const gross = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
-  const net = gross - getVal('s-tax');
-  document.getElementById('total-sales').textContent = fmtMoney(net);
-  document.getElementById('badge-sales').textContent = fmtMoney(net);
-  calcCashVariance();
-}
-function calcKitchen() {
-  const gross = getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt');
-  const net = gross - getVal('k-tax');
-  document.getElementById('total-kitchen').textContent = fmtMoney(net);
-  document.getElementById('badge-kitchen').textContent = fmtMoney(net);
-}
-function calcPayouts() {
-  const cashRows = [...document.querySelectorAll('.payout-amt')];
-  const cashTotal = cashRows.reduce((s,el) => s + (parseFloat(el.value)||0), 0);
-  const t = cashTotal+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
-  document.getElementById('total-payouts').textContent = fmtMoney(t);
-  document.getElementById('badge-payouts').textContent = fmtMoney(t);
-  calcCashVariance();
-}
-function calcCashVariance() {
-  const posCashDeposit = getVal('d-pos'); // What was physically deposited
-  const cashSales = getVal('s-cash');     // Cash collected from POS
-  if(cashSales === 0 && posCashDeposit === 0) {
-    const bar = document.getElementById('cash-variance-bar');
-    if(bar) bar.style.display = 'none';
-    return;
-  }
-  // Expected cash in register:
-  // Cash Sales - Cash Payouts + Lottery Payout - ATM Balance Add + Missing/Extra
-  const cashRows = [...document.querySelectorAll('.payout-amt')];
-  const cashPayout = cashRows.reduce((s,el) => s + (parseFloat(el.value)||0), 0);
-  const lottery = getVal('p-lottery');  // positive adds cash, negative reduces
-  const atm = getVal('p-atm');          // ATM top-up reduces cash in register
-  const misc = getVal('p-misc');        // positive adds, negative reduces
-  const expectedCash = cashSales - cashPayout + lottery - atm + misc;
-  // Variance = what you deposited minus what was expected
-  const variance = posCashDeposit - expectedCash;
-  const bar = document.getElementById('cash-variance-bar');
-  const label = document.getElementById('cash-variance-label');
-  const val = document.getElementById('cash-variance-val');
-  if(!bar) return;
-  if(Math.abs(variance) < 0.005) {
-    bar.style.display = 'none';
-    return;
-  }
-  bar.style.display = 'flex';
-  bar.style.background = 'none';
-  bar.style.border = 'none';
-  label.style.color = variance < 0 ? 'var(--red)' : 'var(--muted)';
-  val.style.color = variance < 0 ? 'var(--red)' : 'var(--text)';
-  label.textContent = variance >= 0 ? 'Cash Over' : 'Cash Short';
-  val.textContent = variance >= 0 ? fmtMoney(variance) : '-' + fmtMoney(Math.abs(variance));
-}
-function showOptionalPayout(rowId) {
-  document.getElementById(rowId).style.display = 'block';
-  // Hide the corresponding add button
-  const btnMap = {'p-game-row':'btn-p-game','p-lotref-row':'btn-p-lotref','p-atm-row':'btn-p-atm'};
-  const btn = document.getElementById(btnMap[rowId]);
-  if(btn) btn.style.display = 'none';
-}
-function removeOptionalPayout(rowId, inputId) {
-  document.getElementById(rowId).style.display = 'none';
-  const el = document.getElementById(inputId);
-  if(el) el.value = '';
-  // Show the add button again
-  const btnMap = {'p-game-row':'btn-p-game','p-lotref-row':'btn-p-lotref','p-atm-row':'btn-p-atm'};
-  const btn = document.getElementById(btnMap[rowId]);
-  if(btn) btn.style.display = 'block';
-  calcPayouts();
-}
-function addCashPayoutRow() {
-  const row = document.createElement('div');
-  row.className = 'cash-payout-row';
-  row.style.cssText = 'display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px;align-items:end';
-  row.innerHTML = `
-    <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" class="payout-amt" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
-    <div class="fgroup"><label>Paid To / Notes</label><input type="text" class="payout-note" placeholder="e.g. Mi Mexico vendor payment"></div>
-    <button onclick="removeCashPayout(this)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>`;
-  document.getElementById('cash-payout-rows').appendChild(row);
-}
-function removeCashPayout(btn) {
-  const rows = document.querySelectorAll('.cash-payout-row');
-  if(rows.length === 1) {
-    // Don't remove last row, just clear it
-    btn.closest('.cash-payout-row').querySelector('.payout-amt').value = '';
-    btn.closest('.cash-payout-row').querySelector('.payout-note').value = '';
-  } else {
-    btn.closest('.cash-payout-row').remove();
-  }
-  calcPayouts();
-}
-function calcTransfer() {
-  const t = getVal('mg-txn'); // Cash field is the deposit
-  document.getElementById('total-transfer').textContent = fmtMoney(t);
-  document.getElementById('badge-transfer').textContent = fmtMoney(t);
-}
-function calcDeposit() {
-  const t = getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other');
-  document.getElementById('total-deposit').textContent = fmtMoney(t);
-  document.getElementById('badge-deposit').textContent = fmtMoney(t);
-  calcCashVariance();
-}
-
-// ---- SPECIALTY ----
-function buildSpecialtyRows() {
-  const container = document.getElementById('specialty-rows');
-  if(!container) return;
-  container.innerHTML = specialtyCategories.map((cat,i) => `
-    <div class="form-grid fg-2" style="margin-bottom:8px" id="scat-${i}">
-      <div class="fgroup">
-        <label>${typeof cat === 'object' ? cat.name : cat}</label>
-        <div class="dollar"><input type="number" id="sc-${i}" step="0.01" placeholder="0.00" oninput="calcSpecialty()"></div>
-      </div>
-      <div class="fgroup" style="justify-content:flex-end;padding-top:18px">
-        <button onclick="removeSpecialtyCat(${i})" style="background:none;border:none;color:var(--hint);cursor:pointer;font-size:13px">✕ Remove</button>
-      </div>
-    </div>
-  `).join('');
-  calcSpecialty();
-}
-async function addSpecialtyRow() {
-  const name = prompt('Category name (e.g. Fresh Bakery):');
-  if(!name) return;
-  try {
-    const saved = await apiPost('/api/categories', {name});
-    const s = Array.isArray(saved) ? saved[0] : saved;
-    specialtyCategories.push({id: s.id, name});
-    buildSpecialtyRows();
-  } catch(e) { showToast('Could not save category'); }
-}
-async function removeSpecialtyCat(i) {
-  const cat = specialtyCategories[i];
-  const id = typeof cat === 'object' ? cat.id : null;
-  specialtyCategories.splice(i,1);
-  buildSpecialtyRows();
-  if(id) {
-    try { await fetch(API+'/api/categories/'+id, {method:'DELETE'}); } catch(e) {}
-  }
-}
-function calcSpecialty() {
-  let t=0;
-  specialtyCategories.forEach((_,i) => { t += getVal('sc-'+i); });
-  document.getElementById('badge-specialty').textContent = fmtMoney(t);
-}
-
-// ---- MACHINES ----
-function buildMachineGrid() {
-  const grid = document.getElementById('machine-grid');
-  grid.innerHTML = Array.from({length:8}, (_,i) => `
-    <div class="mcard">
-      <div class="mcard-label">Machine ${i+1}</div>
-      <div class="mcard-inputs">
-        <div class="fgroup"><label>Total In</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-in" oninput="autoFillNet(${i})"></div></div>
-        <div class="fgroup"><label>Total Out</label><div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-out" oninput="autoFillNet(${i})"></div></div>
-      </div>
-      <div style="margin-top:8px;padding-top:8px;border-top:0.5px solid var(--border)">
-        <div class="fgroup">
-          <label style="display:flex;align-items:center;gap:6px">
-            Net (editable)
-            <span id="m${i}-edited" style="display:none;font-size:10px;color:var(--amber);font-weight:600">✎ MANUAL</span>
-          </label>
-          <div class="dollar"><input type="number" step="1" placeholder="0" id="m${i}-net" 
-            style="font-weight:600;color:var(--green)"
-            oninput="onNetEdit(${i})"></div>
-        </div>
-      </div>
-      <div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:11px;color:var(--muted)">Prev Net</span>
-        <span id="m${i}-prev" style="font-family:var(--mono);font-size:12px;color:var(--hint)">$0</span>
-      </div>
-      <div style="margin-top:4px;background:var(--green-l);border-radius:5px;padding:5px 8px;display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:11px;color:var(--green);font-weight:600">Take Out</span>
-        <span id="m${i}-takeout" style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--green)">$0</span>
-      </div>
-    </div>
-  `).join('');
-}
-function autoFillNet(i) {
-  const tin = getVal('m'+i+'-in');
-  const tout = getVal('m'+i+'-out');
-  const calcNet = tin - tout;
-  const netInput = document.getElementById('m'+i+'-net');
-  // Only auto-fill if not manually edited
-  if(!netInput.dataset.manual) {
-    netInput.value = Math.round(calcNet) || '';
-  }
-  calcMachines();
-}
-function onNetEdit(i) {
-  const netInput = document.getElementById('m'+i+'-net');
-  const tin = getVal('m'+i+'-in');
-  const tout = getVal('m'+i+'-out');
-  const calcNet = tin - tout;
-  const manualNet = getVal('m'+i+'-net');
-  const editedLabel = document.getElementById('m'+i+'-edited');
-  // Mark as manually edited if different from auto-calculated
-  if(Math.round(manualNet) !== Math.round(calcNet) && manualNet > 0) {
-    netInput.dataset.manual = '1';
-    if(editedLabel) editedLabel.style.display = 'inline';
-  } else {
-    delete netInput.dataset.manual;
-    if(editedLabel) editedLabel.style.display = 'none';
-  }
-  calcMachines();
-}
-function calcMachines() {
-  let totalNet = 0;
-  let totalTakeOut = 0;
-  const takeouts = [];
-  for(let i=0;i<8;i++) {
-    const net = getVal('m'+i+'-net') || (getVal('m'+i+'-in') - getVal('m'+i+'-out'));
-    const prevNet = window._prevMachineNets ? (window._prevMachineNets[i] || 0) : 0;
-    const takeout = Math.max(0, net - prevNet);
-    document.getElementById('m'+i+'-takeout').textContent = '$'+Math.round(takeout).toLocaleString();
-    totalNet += net;
-    totalTakeOut += takeout;
-    takeouts.push(takeout);
-  }
-  document.getElementById('mt-net').textContent = fmtMoney(totalNet);
-  document.getElementById('mt-takeout').textContent = fmtMoney(totalTakeOut);
-  document.getElementById('mt-vendor').textContent = fmtMoney(totalTakeOut * 0.4);
-  document.getElementById('mt-store').textContent = fmtMoney(totalTakeOut * 0.6);
-  // Per machine takeout table
-  const table = document.getElementById('machine-takeout-table');
-  if(table) {
-    table.innerHTML = takeouts.map((t,i) => `
-      <div style="text-align:center;padding:8px 4px;background:var(--surface2);border-radius:7px;border:0.5px solid var(--border)">
-        <div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:3px">M${i+1}</div>
-        <div style="font-family:var(--mono);font-size:13px;font-weight:500;color:${t>0?'var(--green)':'var(--hint)'}">\$${Math.round(t).toLocaleString()}</div>
-      </div>`).join('');
-  }
-}
-
-// Load previous day's machine data to calculate take out
-async function loadPrevMachineData() {
-  const date = document.getElementById('machine-date').value;
-  if(!date) return;
-  // Get yesterday's date
-  const d = new Date(date + 'T12:00:00');
-  d.setDate(d.getDate() - 1);
-  const prevDate = d.toISOString().split('T')[0];
-  try {
-    const data = await apiGet('/api/machines?date=' + prevDate);
-    if(data && data.length > 0) {
-      const prev = data[0];
-      window._prevMachineNets = (prev.machines || []).map(m => m.net || 0);
-      // Update prev net displays
-      for(let i=0;i<8;i++) {
-        const prevNet = window._prevMachineNets[i] || 0;
-        const el = document.getElementById('m'+i+'-prev');
-        if(el) el.textContent = '$'+Math.round(prevNet).toLocaleString();
-        // Clear manual flag when date changes
-        const netInput = document.getElementById('m'+i+'-net');
-        if(netInput) { delete netInput.dataset.manual; netInput.value = ''; }
-        const editedEl = document.getElementById('m'+i+'-edited');
-        if(editedEl) editedEl.style.display = 'none';
-      }
-      calcMachines();
-    } else {
-      window._prevMachineNets = Array(8).fill(0);
-      calcMachines();
-    }
-  } catch(e) {
-    window._prevMachineNets = Array(8).fill(0);
-  }
-}
-
-function resetMachines() {
-  if(!confirm('Reset all machines? This sets previous net to 0 for all machines (use after physical reset).')) return;
-  window._prevMachineNets = Array(8).fill(0);
-  for(let i=0;i<8;i++) {
-    const el = document.getElementById('m'+i+'-prev');
-    if(el) el.textContent = '$0';
-  }
-  calcMachines();
-  showToast('Machines reset — previous net cleared');
-}
-async function saveMachines() {
-  const date = document.getElementById('machine-date').value;
-  const machines = Array.from({length:8}, (_,i) => {
-    const tin = getVal('m'+i+'-in');
-    const tout = getVal('m'+i+'-out');
-    const net = getVal('m'+i+'-net') || (tin - tout);
-    const prevNet = window._prevMachineNets ? (window._prevMachineNets[i]||0) : 0;
-    const takeout = Math.max(0, net - prevNet);
-    const manualNet = !!document.getElementById('m'+i+'-net')?.dataset?.manual;
-    return {in:tin, out:tout, net:net, prevNet:prevNet, takeout:takeout, manualNet};
-  });
-  const totalNet = machines.reduce((s,m) => s+m.net, 0);
-  const totalTakeOut = machines.reduce((s,m) => s+m.takeout, 0);
-  const dbRec = {
-    store:'baileys', report_date:date, machines:machines,
-    total_net:totalNet, vendor_pay:totalTakeOut*0.4, store_income:totalTakeOut*0.6,
-    updated_at:new Date().toISOString()
   };
-  try {
-    await apiPost('/api/machines', dbRec);
-    const rec = {date, machines, totalNet, totalTakeOut, vendorPay:totalTakeOut*0.4, storeIncome:totalTakeOut*0.6};
-    const idx = machineReports.findIndex(r => r.date === date);
-    if(idx>=0) machineReports[idx]=rec; else machineReports.push(rec);
-    // Update prevNets for next entry
-    window._prevMachineNets = machines.map(m => m.net);
-    document.getElementById('machine-saved').style.display = 'inline';
-    setTimeout(() => document.getElementById('machine-saved').style.display='none', 3000);
-    showToast('Machine report saved');
-  } catch(e) { showToast('Save failed: ' + e.message); }
-}
-
-// ---- DAILY REPORT SAVE ----
-
-async function checkExistingReport() {
-  const date = document.getElementById('report-date').value;
-  if(!date) return;
-  try {
-    const existing = await apiGet('/api/daily?date=' + date);
-    const indicator = document.getElementById('report-exists-badge');
-    if(existing && existing.length > 0) {
-      const rec = existing[0];
-      const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleTimeString() : '';
-      if(indicator) {
-        indicator.style.display = 'inline-block';
-        indicator.textContent = '✓ Saved at ' + savedAt;
-      }
-    } else {
-      if(indicator) indicator.style.display = 'none';
-    }
-  } catch(e) {}
-}
-
-async function submitDailyReport() {
-  const date = document.getElementById('report-date').value;
-
-  // Check if report already exists for this date
-  if(!window._skipOverwriteCheck) {
-    try {
-      const existing = await apiGet('/api/daily?date=' + date);
-      if(existing && existing.length > 0) {
-        const rec = existing[0];
-        const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleString() : 'earlier';
-        document.getElementById('overwrite-modal-msg').textContent = `A report for ${date} was already saved (${savedAt}). Overwrite it with current data?`;
-        document.getElementById('overwrite-modal').style.display = 'flex';
-        window._pendingSubmitDate = date;
-        return;
-      }
-    } catch(e) { /* proceed if check fails */ }
-  }
-  window._skipOverwriteCheck = false;
-  const specialty = specialtyCategories.map((cat,i) => ({name: typeof cat==='object'?cat.name:cat, amount: getVal('sc-'+i)}));
-  const cashRows = [...document.querySelectorAll('.payout-amt')];
-  const cashPayout = cashRows.reduce((s,el) => s+(parseFloat(el.value)||0), 0);
-  const salesTotal = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
-  const payoutTotal = cashPayout+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
-  const depositTotal = getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other');
-  const dbRec = {
-    store:'baileys', report_date:date,
-    sales_cash:getVal('s-cash'), sales_credit:getVal('s-credit'), sales_debit:getVal('s-debit'),
-    sales_ebt:getVal('s-ebt'), sales_tax:getVal('s-tax'),
-    sales_kitchen:getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt'),
-    sales_total:salesTotal,
-    payout_cash:cashPayout, payout_lottery:getVal('p-lottery'), payout_game:getVal('p-game'),
-    payout_lottery_refund:getVal('p-lotref'), payout_atm:getVal('p-atm'), payout_misc:getVal('p-misc'),
-    payout_total:payoutTotal,
-    moneygram_txn:getVal('mg-txn'), moneygram_dep:getVal('mg-dep'), boss_txn:0, boss_dep:0,
-    deposit_pos:getVal('d-pos'), deposit_lottery:getVal('d-lottery'), deposit_toy:getVal('d-toy'),
-    deposit_coin:getVal('d-coin'), deposit_other:getVal('d-other'), deposit_total:depositTotal,
-    specialty:specialty, category_sales:window._pulledCategories||[],
-    notes:document.getElementById('daily-notes').value,
-    updated_at:new Date().toISOString()
-  };
-  try {
-    await apiPost('/api/daily', dbRec);
-    const rec = {date, sales:{cash:getVal('s-cash'),credit:getVal('s-credit'),debit:getVal('s-debit'),ebt:getVal('s-ebt'),tax:getVal('s-tax'),kitchen:getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt'),total:salesTotal},
-      payouts:{cash:cashPayout,lottery:getVal('p-lottery'),game:getVal('p-game'),lotteryRefund:getVal('p-lotref'),atm:getVal('p-atm'),misc:getVal('p-misc'),total:payoutTotal},
-      transfer:{mgTxn:getVal('mg-txn'),mgDep:getVal('mg-dep'),brTxn:0,brDep:0},
-      deposit:{pos:getVal('d-pos'),lottery:getVal('d-lottery'),toy:getVal('d-toy'),coin:getVal('d-coin'),other:getVal('d-other'),total:depositTotal},
-      specialty, notes:document.getElementById('daily-notes').value};
-    const idx = dailyReports.findIndex(r => r.date === date);
-    if(idx>=0) dailyReports[idx]=rec; else dailyReports.push(rec);
-    document.getElementById('daily-saved').style.display = 'inline';
-    setTimeout(() => document.getElementById('daily-saved').style.display='none', 3000);
-    showToast('Daily report saved to database');
-  } catch(e) { showToast('Save failed: ' + e.message); }
-}
-
-// ---- INVOICES ----
-function openAddInvoiceModal() {
-  document.getElementById('inv-modal-title').textContent = 'Add Invoice';
-  document.getElementById('inv-modal-sub').textContent = 'Fill in the invoice details';
-  document.getElementById('inv-modal-save-btn').textContent = 'Save Invoice';
-  document.getElementById('inv-modal-id').value = '';
-  document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
-  document.getElementById('inv-num').value = '';
-  document.getElementById('inv-vendor-select').value = '';
-  document.getElementById('inv-vendor-new').style.display = 'none';
-  document.getElementById('inv-vendor-new').value = '';
-  document.getElementById('inv-vendor').value = '';
-  document.getElementById('inv-amount').value = '';
-  document.getElementById('inv-status').value = 'unpaid';
-  selectInvPayType('');
-  document.getElementById('inv-check-num').value = '';
-  document.getElementById('inv-notes').value = '';
-  populateVendorSelect();
-  document.getElementById('inv-modal').style.display = 'flex';
-}
-
-function openEditInvoiceModal(id) {
-  const inv = invoices.find(i=>i.id===id);
-  if(!inv) return;
-  document.getElementById('inv-modal-title').textContent = 'Edit Invoice';
-  document.getElementById('inv-modal-sub').textContent = inv.vendor + (inv.num ? ' · #'+inv.num : '');
-  document.getElementById('inv-modal-save-btn').textContent = 'Save Changes';
-  document.getElementById('inv-modal-id').value = id;
-  document.getElementById('inv-date').value = inv.date || '';
-  document.getElementById('inv-num').value = inv.num || '';
-  document.getElementById('inv-amount').value = inv.amount || '';
-  document.getElementById('inv-status').value = inv.status || 'unpaid';
-  selectInvPayType(inv.paytype || '');
-  document.getElementById('inv-check-num').value = inv.checkNumber || '';
-  document.getElementById('inv-notes').value = inv.notes || '';
-  populateVendorSelect();
-  // Set vendor - check if in list or custom
-  const sel = document.getElementById('inv-vendor-select');
-  const opt = [...sel.options].find(o=>o.value===inv.vendor);
-  if(opt) {
-    sel.value = inv.vendor;
-    document.getElementById('inv-vendor').value = inv.vendor;
-    document.getElementById('inv-vendor-new').style.display = 'none';
-  } else {
-    sel.value = '';
-    document.getElementById('inv-vendor-new').value = inv.vendor || '';
-    document.getElementById('inv-vendor-new').style.display = 'block';
-    document.getElementById('inv-vendor').value = inv.vendor || '';
-  }
-  document.getElementById('inv-modal').style.display = 'flex';
-}
-
-function closeInvoiceModal() {
-  document.getElementById('inv-modal').style.display = 'none';
-}
-async function submitConfirmedInvoice() {
-  document.getElementById('inv-confirm-modal').style.display = 'none';
-  const inv = window._pendingInvoice;
-  if(!inv) return;
-  const dbInv = {store:'baileys', invoice_date:inv.date, invoice_num:inv.num, vendor:inv.vendor,
-    amount:inv.amount, status:inv.status, pay_type:inv.paytype||null,
-    check_number:inv.checkNumber||null, notes:inv.notes||null};
-  try {
-    const saved = await apiPost('/api/invoices', dbInv);
-    const savedInv = Array.isArray(saved)?saved[0]:saved;
-    invoices.unshift({id:savedInv?.id||Date.now().toString(),...inv});
-    closeInvoiceModal();
-    renderInvoices();
-    showToast('Invoice saved');
-  } catch(e) { showToast('Save failed: '+e.message); }
-}
-
-function populateVendorSelect() {
-  loadVendorData();
-  const all = vendorList.map(v=>v.name).sort();
-  const sel = document.getElementById('inv-vendor-select');
-  if(!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">— Select vendor —</option>' + all.map(v=>`<option value="${v}">${v}</option>`).join('');
-  if(cur) sel.value = cur;
-}
-
-function onVendorSelect() {
-  const val = document.getElementById('inv-vendor-select').value;
-  document.getElementById('inv-vendor').value = val;
-  document.getElementById('inv-vendor-new').style.display = 'none';
-  document.getElementById('inv-vendor-new').value = '';
-}
-
-function showNewVendorInput() {
-  document.getElementById('inv-vendor-select').value = '';
-  document.getElementById('inv-vendor').value = '';
-  const inp = document.getElementById('inv-vendor-new');
-  inp.style.display = 'block';
-  inp.focus();
-  inp.oninput = () => { document.getElementById('inv-vendor').value = inp.value; };
-}
-
-async function saveInvoiceModal() {
-  const id = document.getElementById('inv-modal-id').value;
-  const vendor = document.getElementById('inv-vendor').value.trim() || document.getElementById('inv-vendor-new').value.trim();
-  const amount = parseFloat(document.getElementById('inv-amount').value)||0;
-  if(!vendor) { showToast('Enter a vendor name'); return; }
-  if(!amount) { showToast('Enter an amount'); return; }
-  const paytype = document.getElementById('inv-paytype').value;
-  const checkNum = paytype==='check' ? document.getElementById('inv-check-num').value.trim() : '';
-  const inv = {
-    date: document.getElementById('inv-date').value,
-    num: document.getElementById('inv-num').value,
-    vendor, amount,
-    status: document.getElementById('inv-status').value,
-    paytype, checkNumber: checkNum,
-    notes: document.getElementById('inv-notes').value
-  };
-  if(id) {
-    // Edit existing
-    const dbUpd = {vendor:inv.vendor, invoice_date:inv.date, invoice_num:inv.num, amount:inv.amount,
-      status:inv.status, pay_type:inv.paytype||null, check_number:inv.checkNumber||null, notes:inv.notes||null, updated_at:new Date().toISOString()};
-    try {
-      await apiPut('/api/invoices/'+id, dbUpd);
-      const local = invoices.find(i=>i.id===id);
-      if(local) Object.assign(local, {date:inv.date,num:inv.num,vendor:inv.vendor,amount:inv.amount,status:inv.status,paytype:inv.paytype,checkNumber:inv.checkNumber,notes:inv.notes});
-      closeInvoiceModal();
-      renderInvoices();
-      showToast('Invoice updated');
-    } catch(e) { showToast('Save failed: '+e.message); }
-  } else {
-    // Add new - duplicate check
-    // Duplicate check: same invoice number + vendor + amount
-    if(inv.num) {
-      const dup = invoices.find(i => i.num && i.num.trim().toLowerCase()===inv.num.trim().toLowerCase()
-        && i.vendor.trim().toLowerCase()===vendor.toLowerCase()
-        && Math.abs(i.amount - inv.amount) < 0.01);
-      if(dup) {
-        showToast(`Invoice #${inv.num} from ${vendor} for ${fmtMoney(inv.amount)} already exists (${dup.date})`);
-        return; // Block submit
-      }
-    }
-    // Check number validation
-    if(inv.paytype === 'check') {
-      if(!inv.checkNumber) { showToast('Enter a check number for check payment'); document.getElementById('inv-check-num').focus(); return; }
-      // Check if check number used before
-      const checkUsed = invoices.find(i => i.checkNumber && i.checkNumber === inv.checkNumber && i.id !== id);
-      if(checkUsed) {
-        if(checkUsed.vendor.toLowerCase() !== vendor.toLowerCase()) {
-          showToast(`Check #${inv.checkNumber} was already used for ${checkUsed.vendor} (${fmtMoney(checkUsed.amount)}). Different vendor — cannot reuse.`);
-          return;
-        } else {
-          const proceed = confirm(`Check #${inv.checkNumber} was already used to pay Invoice #${checkUsed.num||'—'} for ${checkUsed.vendor} · ${fmtMoney(checkUsed.amount)}\n\nUse the same check for this payment as well?`);
-          if(!proceed) return;
-        }
-      }
-    }
-    // Show confirmation popup before saving
-    window._pendingInvoice = inv;
-    const rows = [
-      ['Receipt Date', inv.date],
-      ['Invoice Number', inv.num || '—'],
-      ['Vendor', inv.vendor],
-      ['Amount', fmtMoney(inv.amount)],
-      ['Status', inv.status.charAt(0).toUpperCase()+inv.status.slice(1)],
-      ['Pay Type', inv.paytype || '—'],
-      inv.paytype==='check' ? ['Check Number', inv.checkNumber||'—'] : null,
-      ['Notes', inv.notes || '—'],
-    ].filter(Boolean);
-    document.getElementById('inv-confirm-body').innerHTML = rows.map(([label,val]) =>
-      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid #f0eeea">
-        <span style="color:#6b6860">${label}</span>
-        <span style="font-weight:500;max-width:200px;text-align:right">${val}</span>
-      </div>`
-    ).join('');
-    document.getElementById('inv-confirm-modal').style.display = 'flex';
-  }
-}
-
-function loadVendorList() {
-  const vendors = ['Mi Mexico','EMD','Costco','Restaurant Depot','Sysco','US Foods','Pepsi','Coca-Cola','Modelo','Performance Food Group'];
-  const dl = document.getElementById('vendor-list');
-  dl.innerHTML = vendors.map(v => `<option value="${v}">`).join('');
-}
-async function addInvoice() {
-  const inv = {
-    id: Date.now().toString(),
-    date: document.getElementById('inv-date').value,
-    num: document.getElementById('inv-num').value,
-    vendor: document.getElementById('inv-vendor').value,
-    amount: parseFloat(document.getElementById('inv-amount').value) || 0,
-    status: document.getElementById('inv-status').value,
-    paytype: document.getElementById('inv-paytype').value,
-    notes: document.getElementById('inv-notes').value
-  };
-  if(!inv.vendor || !inv.amount) { showToast('Enter vendor and amount'); return; }
-  // Duplicate check: same vendor + same invoice number
-  if(inv.num) {
-    const dup = invoices.find(i => i.num && i.num.trim().toLowerCase() === inv.num.trim().toLowerCase() && i.vendor.trim().toLowerCase() === inv.vendor.trim().toLowerCase());
-    if(dup) {
-      const proceed = confirm(`⚠️ Duplicate detected!\n\nInvoice #${inv.num} from ${inv.vendor} was already entered on ${dup.date} for ${fmtMoney(dup.amount)}.\n\nAdd anyway?`);
-      if(!proceed) return;
-    }
-  }
-  const dbInv = {
-    store:'baileys', invoice_date:inv.date, invoice_num:inv.num, vendor:inv.vendor,
-    amount:inv.amount, status:inv.status, pay_type:inv.paytype||null, notes:inv.notes||null
-  };
-  try {
-    const saved = await apiPost('/api/invoices', dbInv);
-    const savedInv = Array.isArray(saved) ? saved[0] : saved;
-    inv.id = savedInv?.id || inv.id;
-    invoices.unshift(inv);
-    document.getElementById('inv-num').value='';
-    document.getElementById('inv-vendor').value='';
-    document.getElementById('inv-amount').value='';
-    document.getElementById('inv-notes').value='';
-    document.getElementById('inv-status').value='unpaid';
-    document.getElementById('inv-paytype').value='';
-    renderInvoices();
-    showToast('Invoice saved to database');
-  } catch(e) { showToast('Save failed: ' + e.message); }
-}
-
-function toggleSelectAll(cb) {
-  document.querySelectorAll('.inv-cb').forEach(c => { c.checked = cb.checked; });
-  updateBulkBar();
-}
-function updateBulkBar() {
-  const checked = [...document.querySelectorAll('.inv-cb:checked')];
-  const bar = document.getElementById('bulk-pay-bar');
-  if(!bar) return;
-  if(checked.length > 0) {
-    bar.style.display = 'flex';
-    const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
-    document.getElementById('bulk-selected-label').textContent = checked.length + ' invoice' + (checked.length>1?'s':'') + ' selected';
-    document.getElementById('bulk-selected-total').textContent = fmtMoney(total);
-  } else {
-    bar.style.display = 'none';
-  }
-  // uncheck select-all if not all checked
-  const all = document.querySelectorAll('.inv-cb');
-  const selectAll = document.getElementById('select-all-cb');
-  if(selectAll) selectAll.checked = all.length > 0 && checked.length === all.length;
-}
-function clearSelection() {
-  document.querySelectorAll('.inv-cb').forEach(c => c.checked = false);
-  const selectAll = document.getElementById('select-all-cb');
-  if(selectAll) selectAll.checked = false;
-  updateBulkBar();
-}
-function bulkMarkPaid() {
-  const checked = [...document.querySelectorAll('.inv-cb:checked')];
-  if(!checked.length) return;
-  const ids = checked.map(c => c.dataset.id);
-  // Open modal in bulk mode
-  const modal = document.getElementById('pay-modal');
-  const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
-  document.getElementById('pay-modal-vendor').textContent = ids.length + ' invoices — Total ' + fmtMoney(total);
-  document.getElementById('pay-modal-id').value = ids.join(',');
-  document.getElementById('pay-modal-type').value = '';
-  document.querySelectorAll('.paytype-btn').forEach(b => b.classList.remove('selected'));
-  document.getElementById('check-number-row').style.display = 'none';
-  document.getElementById('check-number').value = '';
-  modal.style.display = 'flex';
-}
-
-
-function revertUnpaid(id) {
-  const inv = invoices.find(i => i.id===id);
-  if(!inv) return;
-  document.getElementById('revert-modal-id').value = id;
-  document.getElementById('revert-modal-detail').textContent = inv.vendor + ' — ' + fmtMoney(inv.amount) + (inv.num ? ' · Invoice #' + inv.num : '') + (inv.paidDate ? ' · Paid ' + inv.paidDate : '');
-  document.getElementById('revert-modal').style.display = 'flex';
-}
-async function confirmRevert() {
-  const id = document.getElementById('revert-modal-id').value;
-  const inv = invoices.find(i => i.id===id);
-  if(!inv) return;
-  try {
-    await apiPut('/api/invoices/'+id, {status:'unpaid', pay_type:null, paid_date:null, check_number:null, updated_at:new Date().toISOString()});
-    inv.status='unpaid';
-    delete inv.paytype; delete inv.paidDate; delete inv.checkNumber;
-    document.getElementById('revert-modal').style.display = 'none';
-    renderInvoices();
-    showToast('Invoice reverted to unpaid');
-  } catch(e) { showToast('Save failed: ' + e.message); }
-}
-
-function markPaid(id) {
-  const inv = invoices.find(i => i.id===id);
-  if(!inv) return;
-  // Show inline modal
-  const modal = document.getElementById('pay-modal');
-  document.getElementById('pay-modal-vendor').textContent = inv.vendor + ' — $' + inv.amount.toFixed(2);
-  document.getElementById('pay-modal-id').value = id;
-  document.getElementById('pay-modal-type').value = '';
-  modal.style.display = 'flex';
-}
-
-function selectPayType(type) {
-  document.querySelectorAll('.paytype-btn').forEach(b => b.classList.remove('selected'));
-  document.querySelector(`.paytype-btn[data-type="${type}"]`).classList.add('selected');
-  document.getElementById('pay-modal-type').value = type;
-  // Show check number field only for check payments
-  const checkRow = document.getElementById('check-number-row');
-  checkRow.style.display = type === 'check' ? 'block' : 'none';
-  if(type !== 'check') document.getElementById('check-number').value = '';
-}
-async function confirmMarkPaid() {
-  const idField = document.getElementById('pay-modal-id').value;
-  const paytype = document.getElementById('pay-modal-type').value;
-  if(!paytype) { showToast('Select a payment method'); return; }
-  const checkNum = document.getElementById('check-number').value.trim();
-  if(paytype === 'check' && !checkNum) { showToast('Enter the check number'); document.getElementById('check-number').focus(); return; }
-  // Support single or bulk (comma-separated ids)
-  const ids = idField.split(',').map(s => s.trim()).filter(Boolean);
-  const paidDate = new Date().toISOString().split('T')[0];
-  const updates = {status:'paid', pay_type:paytype, paid_date:paidDate, updated_at:new Date().toISOString()};
-  if(paytype==='check') updates.check_number = checkNum;
-  try {
-    await Promise.all(ids.map(id => apiPut('/api/invoices/'+id, updates)));
-    ids.forEach(id => {
-      const inv = invoices.find(i => i.id===id);
-      if(!inv) return;
-      inv.status='paid'; inv.paytype=paytype; inv.paidDate=paidDate;
-      if(paytype==='check') inv.checkNumber=checkNum;
-    });
-    document.getElementById('pay-modal').style.display = 'none';
-    document.getElementById('check-number-row').style.display = 'none';
-    document.getElementById('check-number').value = '';
-    renderInvoices();
-    const count = ids.length;
-    showToast(count > 1 ? count + ' invoices marked as paid' : 'Invoice marked as paid');
-  } catch(e) { showToast('Save failed: ' + e.message); }
-}
-function closePayModal() {
-  document.getElementById('pay-modal').style.display = 'none';
-}
-
-function filterInvoices() {
-  const q = document.getElementById('inv-search').value.trim().toLowerCase();
-  const status = document.getElementById('inv-filter-status').value;
-  const resultsDiv = document.getElementById('inv-search-results');
-
-  if(!q && status === 'all') {
-    resultsDiv.style.display = 'none';
-    return;
-  }
-
-  let filtered = invoices.filter(inv => {
-    const matchVendor = !q || (inv.vendor||'').toLowerCase().includes(q);
-    const matchNum = !q || (inv.num||'').toLowerCase().includes(q);
-    const matchAmount = !q || String(inv.amount||'').includes(q);
-    const matchStatus = status === 'all' || inv.status === status;
-    return (matchVendor || matchNum || matchAmount) && matchStatus;
-  });
-
-  resultsDiv.style.display = 'block';
-  const total = filtered.reduce((s,i) => s+i.amount, 0);
-  const unpaidCount = filtered.filter(i => i.status==='unpaid').length;
-  document.getElementById('inv-search-count').textContent = filtered.length + ' found — ' + fmtMoney(total);
-
-  const title = q ? `"${q}"` : 'Filtered';
-  document.getElementById('inv-search-title').textContent = title + (status !== 'all' ? ' — ' + status : '');
-
-  const container = document.getElementById('inv-search-list');
-  if(!filtered.length) {
-    container.innerHTML = '<div class="empty-state"><div>🔍</div>No invoices found</div>';
-    return;
-  }
-
-  const hasUnpaid = filtered.some(i => i.status === 'unpaid');
-  container.innerHTML = `
-    ${hasUnpaid ? `<div id="bulk-pay-bar-search" style="display:none;background:var(--green-l);border:0.5px solid var(--green-m);border-radius:8px;padding:10px 14px;margin-bottom:12px;align-items:center;gap:12px;flex-wrap:wrap">
-      <span style="font-size:13px;font-weight:500;color:var(--green)" id="bulk-selected-label-s">0 selected</span>
-      <span style="font-size:13px;font-family:var(--mono);color:var(--green)" id="bulk-selected-total-s">$0.00</span>
-      <button onclick="bulkMarkPaidSearch()" style="margin-left:auto;background:var(--green);color:white;border:none;padding:7px 16px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Pay Selected</button>
-      <button onclick="clearSelectionSearch()" style="background:none;border:0.5px solid var(--border2);padding:7px 12px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer">Clear</button>
-    </div>` : ''}
-    <table class="inv-table"><thead><tr>
-      ${hasUnpaid ? '<th style="width:32px"><input type="checkbox" id="select-all-s" onclick="toggleSelectAllSearch(this)"></th>' : '<th></th>'}
-      <th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th></th>
-    </tr></thead><tbody>${
-      filtered.map(inv => `<tr>
-        <td>${inv.status==='unpaid' ? `<input type="checkbox" class="inv-cb-s" data-id="${inv.id}" data-amount="${inv.amount}" onchange="updateBulkBarSearch()">` : ''}</td>
-        <td>${inv.date}</td>
-        <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
-        <td>${inv.vendor}</td>
-        <td class="num">${fmtMoney(inv.amount)}</td>
-        <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
-        <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
-        <td style="display:flex;gap:4px">
-          <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')" style="background:var(--blue-l);color:var(--blue);border-color:var(--blue)">Edit</button>
-          ${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Pay</button>` : `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>`}
-        </td>
-      </tr>`).join('')
-    }</tbody></table>`;
-}
-
-function clearInvSearch() {
-  document.getElementById('inv-search').value = '';
-  document.getElementById('inv-filter-status').value = 'all';
-  document.getElementById('inv-search-results').style.display = 'none';
-}
-
-function toggleSelectAllSearch(cb) {
-  document.querySelectorAll('.inv-cb-s').forEach(c => c.checked = cb.checked);
-  updateBulkBarSearch();
-}
-function updateBulkBarSearch() {
-  const checked = [...document.querySelectorAll('.inv-cb-s:checked')];
-  const bar = document.getElementById('bulk-pay-bar-search');
-  if(!bar) return;
-  if(checked.length > 0) {
-    bar.style.display = 'flex';
-    const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
-    document.getElementById('bulk-selected-label-s').textContent = checked.length + ' invoice' + (checked.length>1?'s':'') + ' selected';
-    document.getElementById('bulk-selected-total-s').textContent = fmtMoney(total);
-  } else {
-    bar.style.display = 'none';
-  }
-}
-function clearSelectionSearch() {
-  document.querySelectorAll('.inv-cb-s').forEach(c => c.checked = false);
-  const selectAll = document.getElementById('select-all-s');
-  if(selectAll) selectAll.checked = false;
-  updateBulkBarSearch();
-}
-function bulkMarkPaidSearch() {
-  const checked = [...document.querySelectorAll('.inv-cb-s:checked')];
-  if(!checked.length) return;
-  const ids = checked.map(c => c.dataset.id);
-  const total = checked.reduce((s,c) => s + parseFloat(c.dataset.amount), 0);
-  const modal = document.getElementById('pay-modal');
-  document.getElementById('pay-modal-vendor').textContent = ids.length + ' invoices — Total ' + fmtMoney(total);
-  document.getElementById('pay-modal-id').value = ids.join(',');
-  document.getElementById('pay-modal-type').value = '';
-  document.querySelectorAll('.paytype-btn').forEach(b => b.classList.remove('selected'));
-  document.getElementById('check-number-row').style.display = 'none';
-  document.getElementById('check-number').value = '';
-  modal.style.display = 'flex';
-}
-
-function renderInvoices() {
-  // Sort invoices by date desc then vendor asc
-  invoices.sort((a,b) => {
-    const dc = (b.date||'').localeCompare(a.date||'');
-    return dc !== 0 ? dc : (a.vendor||'').localeCompare(b.vendor||'');
-  });
-  const unpaid = invoices.filter(i => i.status==='unpaid');
-  const unpaidTotal = unpaid.reduce((s,i) => s+i.amount, 0);
-  document.getElementById('badge-unpaid').textContent = `${unpaid.length} — ${fmtMoney(unpaidTotal)}`;
-  // Render unpaid with checkboxes for bulk payment
-  const unpaidContainer = document.getElementById('unpaid-list');
-  if(!unpaid.length) {
-    unpaidContainer.innerHTML = '<div class="empty-state"><div>📄</div>No unpaid invoices</div>';
-  } else {
-    unpaidContainer.innerHTML = `
-      <div id="bulk-pay-bar" style="display:none;background:var(--green-l);border:0.5px solid var(--green-m);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
-        <span style="font-size:13px;font-weight:500;color:var(--green)" id="bulk-selected-label">0 invoices selected</span>
-        <span style="font-size:13px;font-family:var(--mono);color:var(--green)" id="bulk-selected-total">$0.00</span>
-        <button onclick="bulkMarkPaid()" style="margin-left:auto;background:var(--green);color:white;border:none;padding:7px 16px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Pay Selected</button>
-        <button onclick="clearSelection()" style="background:none;border:0.5px solid var(--border2);padding:7px 12px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer">Clear</button>
-      </div>
-      <table class="inv-table"><thead><tr>
-        <th style="width:32px"><input type="checkbox" id="select-all-cb" onclick="toggleSelectAll(this)"></th>
-        <th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Notes</th><th></th>
-      </tr></thead><tbody>${
-        unpaid.map(inv => `<tr>
-          <td><input type="checkbox" class="inv-cb" data-id="${inv.id}" data-amount="${inv.amount}" onchange="updateBulkBar()"></td>
-          <td>${inv.date}</td>
-          <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
-          <td>${inv.vendor}</td>
-          <td class="num">${fmtMoney(inv.amount)}</td>
-          <td style="font-size:12px;color:var(--muted);max-width:120px">${inv.notes||'—'}</td>
-          <td style="display:flex;gap:4px">
-            <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')">Edit</button>
-            <button class="item-save" onclick="markPaid('${inv.id}')">Pay</button>
-          </td>
-        </tr>`).join('')
-      }</tbody></table>`;
-  }
-
-  // Render all invoices (read only)
-  const allContainer = document.getElementById('all-invoices-list');
-  if(!invoices.length) {
-    allContainer.innerHTML = '<div class="empty-state"><div>📋</div>No invoices yet</div>';
-  } else {
-    allContainer.innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th>Paid Date</th><th>Notes</th><th></th></tr></thead><tbody>${
-      invoices.map(inv => `<tr>
-        <td>${inv.date}</td>
-        <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
-        <td>${inv.vendor}</td>
-        <td class="num">${fmtMoney(inv.amount)}</td>
-        <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
-        <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
-        <td style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</td>
-        <td style="font-size:12px;color:var(--muted);max-width:120px">${inv.notes||'—'}</td>
-        <td style="display:flex;gap:4px">
-          <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')" style="background:var(--blue-l);color:var(--blue);border-color:var(--blue)">Edit</button>
-          ${inv.status==='paid' ? `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>` : ''}
-        </td>
-      </tr>`).join('')
-    }</tbody></table>`;
-  }
-  updateDashboard();
-  // Refresh search if active
-  const _s = document.getElementById('inv-search');
-  const _f = document.getElementById('inv-filter-status');
-  if(_s && (_s.value.trim() || (_f && _f.value !== 'all'))) filterInvoices();
-}
-
-// ---- DASHBOARD ----
-// Track current dashboard month
-let _dashMonth = null;
-function changeMonth(dir) {
-  const parts = _dashMonth.split('-');
-  const d = new Date(parseInt(parts[0]), parseInt(parts[1])-1+dir, 1);
-  _dashMonth = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-  updateDashboard();
-}
-
-function updateDashboard() {
-  const now = new Date();
-  if(!_dashMonth) _dashMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
-  const ym = _dashMonth;
-  const [yr, mo] = ym.split('-').map(Number);
-  const monthName = new Date(yr, mo-1, 1).toLocaleString('default',{month:'long',year:'numeric'});
-  document.getElementById('d-month-label').textContent = monthName;
-
-  // --- SECTION 1: Last saved report ---
-  // Find most recent day before today with data
-  const _todayStr = new Date().toISOString().split('T')[0];
-  const sorted = [...dailyReports].filter(r=>r.date && r.date < _todayStr).sort((a,b)=>b.date.localeCompare(a.date));
-  const last = sorted[0];
-  if(last) {
-    const _dp = last.date.split('-');
-    const _months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    document.getElementById('ls-date').textContent = _months[parseInt(_dp[1])-1] + ' ' + parseInt(_dp[2]) + ', ' + _dp[0];
-    const _bossLast = (last.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales || 0;
-    const lsNet = (last.sales?.cash||0)+(last.sales?.credit||0)+(last.sales?.debit||0)+(last.sales?.ebt||0)-(last.sales?.tax||0) - _bossLast;
-    document.getElementById('ls-sales').textContent = fmtMoney(lsNet);
-    // Purchases on that date
-    const lastPurch = invoices.filter(i=>i.date===last.date).reduce((s,i)=>s+i.amount,0);
-    document.getElementById('ls-purch').textContent = fmtMoney(lastPurch);
-    // Top 5 categories
-    const _excludeCats = ['BOSS RECARGAS','Uncategorized','Misc'];
-    const lastCats = (last.category_sales||[]).filter(c=>c.netSales>0 && !_excludeCats.includes(c.name)).sort((a,b)=>b.netSales-a.netSales).slice(0,5);
-    const catContainer = document.getElementById('ls-categories');
-    if(lastCats.length) {
-      const maxCat = lastCats[0].netSales;
-      catContainer.innerHTML = lastCats.map((c,i) => {
-        const pct = Math.round(c.netSales/maxCat*100);
-        return `<div style="background:rgba(255,255,255,0.08);border-radius:7px;padding:8px 10px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:12px;color:rgba(255,255,255,0.85);font-weight:500">${c.name}</span>
-            <span style="font-family:var(--mono);font-size:12px;color:#a8e6c0">${fmtMoney(c.netSales)}</span>
-          </div>
-          <div style="height:3px;background:rgba(255,255,255,0.15);border-radius:2px">
-            <div style="width:${pct}%;height:100%;background:#a8e6c0;border-radius:2px"></div>
-          </div>
-        </div>`;
-      }).join('');
-    } else {
-      catContainer.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px">No category data for this report</div>';
-    }
-  } else {
-    document.getElementById('ls-date').textContent = '—';
-    document.getElementById('ls-sales').textContent = '$0.00';
-    document.getElementById('ls-purch').textContent = '$0.00';
-    document.getElementById('ls-categories').innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px">No reports saved yet</div>';
-  }
-
-  // --- SECTION 2: Monthly summary ---
-  const monthReports = dailyReports.filter(r => r.date && r.date.startsWith(ym));
-  const daysRecorded = monthReports.length;
-  const salesMTD = monthReports.reduce((s,r) => {
-    const gross = (r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0);
-    // BOSS RECARGAS is a money transfer service, not actual product sales - exclude it
-    const bossAmt = (r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales || 0;
-    return s + gross - bossAmt;
-  }, 0);
-  const monthInvoices = invoices.filter(i => i.date && i.date.startsWith(ym));
-  // Only Purchase type for main purchase metric
-  const getPurchaseType = (inv) => {
-    const v = vendorList.find(vl=>vl.name===inv.vendor);
-    return v?.type || 'Purchase';
-  };
-  const purchMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Purchase').reduce((s,i)=>s+i.amount,0);
-  const repairMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Repair').reduce((s,i)=>s+i.amount,0);
-  const officeMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Office Supplies').reduce((s,i)=>s+i.amount,0);
-  const machMTD = machineReports.filter(r => r.date && r.date.startsWith(ym)).reduce((s,r) => s+(r.storeIncome||0), 0);
-  const margin = salesMTD > 0 ? ((salesMTD - purchMTD)/salesMTD*100).toFixed(1) : null;
-  const avgSale = daysRecorded > 0 ? salesMTD/daysRecorded : 0;
-  const avgPurch = daysRecorded > 0 ? purchMTD/daysRecorded : 0;
-  const unpaid = invoices.filter(i => i.status==='unpaid');
-  const unpaidAmt = unpaid.reduce((s,i) => s+i.amount, 0);
-
-  const daysInMonth = new Date(yr, mo, 0).getDate();
-  const estSales = avgSale * daysInMonth;
-  const estPurch = avgPurch * daysInMonth;
-  document.getElementById('d-sales-mtd').textContent = fmtMoney(salesMTD);
-  document.getElementById('d-purch-mtd').textContent = fmtMoney(purchMTD);
-  document.getElementById('d-margin').textContent = margin ? margin+'%' : '—';
-  document.getElementById('d-avg-sale').textContent = fmtMoney(avgSale);
-  document.getElementById('d-avg-purch').textContent = fmtMoney(avgPurch);
-  document.getElementById('d-sales-est').textContent = fmtMoney(estSales);
-  document.getElementById('d-purch-est').textContent = fmtMoney(estPurch);
-  document.getElementById('d-machine-inc').textContent = fmtMoney(machMTD);
-  document.getElementById('d-unpaid-amt').textContent = fmtMoney(unpaidAmt);
-  document.getElementById('d-unpaid-count').textContent = unpaid.length+' invoice'+(unpaid.length!==1?'s':'');
-  const repairEl = document.getElementById('d-repair-mtd');
-  const officeEl = document.getElementById('d-office-mtd');
-  if(repairEl) repairEl.textContent = fmtMoney(repairMTD);
-  if(officeEl) officeEl.textContent = fmtMoney(officeMTD);
-  document.getElementById('d-sales-days').textContent = daysRecorded+' day'+(daysRecorded!==1?'s':'')+' recorded';
-
-  // Top 5 categories this month
-  const catMap = {};
-  monthReports.forEach(r => {
-    (r.category_sales||[]).filter(c=>c.name!=='BOSS RECARGAS').forEach(c => {
-      if(!catMap[c.name]) catMap[c.name] = 0;
-      catMap[c.name] += c.netSales||0;
+  if (bodyStr) options.headers['Content-Length'] = Buffer.byteLength(bodyStr);
+  const req = https.request(options, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try { callback(null, JSON.parse(data || '[]'), res.statusCode); }
+      catch(e) { callback(null, data, res.statusCode); }
     });
   });
-  const _excl = ['BOSS RECARGAS','Uncategorized','Misc'];
-  const topCats = Object.entries(catMap).filter(([k,v])=>v>0 && !_excl.includes(k)).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  const topCatEl = document.getElementById('d-top-cats');
-  if(topCats.length) {
-    const maxV = topCats[0][1];
-    topCatEl.innerHTML = topCats.map(([name,val]) => {
-      const pct = Math.round(val/maxV*100);
-      return `<div style="margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-          <span style="font-size:13px;font-weight:500">${name}</span>
-          <span style="font-family:var(--mono);font-size:13px;color:var(--green)">${fmtMoney(val)}</span>
-        </div>
-        <div style="height:4px;background:var(--border);border-radius:2px">
-          <div style="width:${pct}%;height:100%;background:var(--green);border-radius:2px"></div>
-        </div>
-      </div>`;
-    }).join('');
-  } else {
-    topCatEl.innerHTML = '<div class="empty-state" style="padding:16px"><div>📊</div>No category data for this month</div>';
-  }
-
-  // Weekly bars
-  // Week starts Monday - find this week's Monday
-  const _today = new Date();
-  const _dow = _today.getDay(); // 0=Sun,1=Mon...6=Sat
-  const _daysFromMon = (_dow === 0) ? 6 : _dow - 1; // days since Monday
-  const weekDays = [0,1,2,3,4,5,6].map(i => {
-    const dt = new Date(_today);
-    dt.setDate(_today.getDate() - _daysFromMon + i);
-    return dt.toISOString().split('T')[0];
-  });
-  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const weekData = weekDays.map((d,i) => {
-    const r = dailyReports.find(r=>r.date===d);
-    const boss = (r?.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;
-    const net = r ? (r.sales.cash+r.sales.credit+r.sales.debit+r.sales.ebt-r.sales.tax-boss) : 0;
-    return {date:d, total:net, label:dayNames[i]};
-  });
-  const maxVal = Math.max(...weekData.map(d=>d.total), 1);
-  buildCatPickers();
-  const weekTotal = weekData.reduce((s,d)=>s+d.total,0);
-  document.getElementById('weekly-bars').innerHTML = weekData.map(d => {
-    const pct = Math.round((d.total/maxVal)*100);
-    const isToday = d.date === _todayStr;
-    return `<div class="bar-row"><div class="bar-label" style="${isToday?'font-weight:600;color:var(--green)':''}">${d.label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${d.total>0?'var(--green)':'var(--border)'}"></div></div><div class="bar-val">${d.total>0?fmtMoney(d.total):'—'}</div></div>`;
-  }).join('') + `<div class="bar-row" style="border-top:0.5px solid var(--border);margin-top:6px;padding-top:6px">
-    <div class="bar-label" style="font-weight:600">Total</div>
-    <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--green-m)"></div></div>
-    <div class="bar-val" style="font-weight:600;color:var(--green)">${fmtMoney(weekTotal)}</div>
-  </div>`;
+  req.on('error', callback);
+  if (bodyStr) req.write(bodyStr);
+  req.end();
 }
 
-// ---- WEEKLY REPORT ----
-function updateWeeklyReport() {
-  const weeks = {};
-  dailyReports.forEach(r => {
-    if(!r.date) return;
-    const d = new Date(r.date+'T12:00:00');
-    const monday = new Date(d); monday.setDate(d.getDate()-((d.getDay()+6)%7));
-    const wk = monday.toISOString().split('T')[0];
-    if(!weeks[wk]) weeks[wk]={sales:0,purchases:0};
-    weeks[wk].sales += (r.sales?.total||0);
-  });
-  invoices.forEach(inv => {
-    if(!inv.date) return;
-    const d = new Date(inv.date+'T12:00:00');
-    const monday = new Date(d); monday.setDate(d.getDate()-((d.getDay()+6)%7));
-    const wk = monday.toISOString().split('T')[0];
-    if(!weeks[wk]) weeks[wk]={sales:0,purchases:0};
-    weeks[wk].purchases += inv.amount;
-  });
-  const sorted = Object.keys(weeks).sort().reverse().slice(0,8);
-  const body = document.getElementById('weekly-report-body');
-  if(!sorted.length) { body.innerHTML='<div class="empty-state"><div>📊</div>No data yet — enter daily reports to see weekly comparison</div>'; return; }
-  body.innerHTML = `<table class="report-table"><thead><tr><th>Week of</th><th class="num">Sales</th><th class="num">Purchases</th><th class="num">Gross Profit</th><th class="num">Margin</th></tr></thead><tbody>${
-    sorted.map(wk => {
-      const w=weeks[wk]; const profit=w.sales-w.purchases; const margin=w.sales>0?((profit/w.sales)*100).toFixed(1)+'%':'—';
-      return `<tr><td>${wk}</td><td class="num">${fmtMoney(w.sales)}</td><td class="num">${fmtMoney(w.purchases)}</td><td class="num" style="color:var(--green)">${fmtMoney(profit)}</td><td class="num">${margin}</td></tr>`;
-    }).join('')
-  }</tbody></table>`;
-}
-
-function confirmOverwrite() {
-  document.getElementById('overwrite-modal').style.display = 'none';
-  window._skipOverwriteCheck = true;
-  submitDailyReport();
-}
-
-async function loadReportForEdit() {
-  const date = document.getElementById('edit-date').value;
-  if(!date) { showToast('Select a date first'); return; }
-  const status = document.getElementById('edit-status');
-  status.textContent = 'Loading...';
-  try {
-    const data = await apiGet('/api/daily?date=' + date);
-    if(!data || !data.length) {
-      status.textContent = 'No report found for ' + date;
-      document.getElementById('edit-form').style.display = 'none';
-      return;
-    }
-    const r = data[0];
-    document.getElementById('e-cash').value = r.sales_cash || '';
-    document.getElementById('e-credit').value = r.sales_credit || '';
-    document.getElementById('e-debit').value = r.sales_debit || '';
-    document.getElementById('e-ebt').value = r.sales_ebt || '';
-    document.getElementById('e-tax').value = r.sales_tax || '';
-    document.getElementById('e-kitchen').value = r.sales_kitchen || '';
-    document.getElementById('e-pcash').value = r.payout_cash || '';
-    document.getElementById('e-lottery').value = r.payout_lottery || '';
-    document.getElementById('e-game').value = r.payout_game || '';
-    document.getElementById('e-lotref').value = r.payout_lottery_refund || '';
-    document.getElementById('e-atm').value = r.payout_atm || '';
-    document.getElementById('e-misc').value = r.payout_misc || '';
-    document.getElementById('e-pos').value = r.deposit_pos || '';
-    document.getElementById('e-dlottery').value = r.deposit_lottery || '';
-    document.getElementById('e-toy').value = r.deposit_toy || '';
-    document.getElementById('e-coin').value = r.deposit_coin || '';
-    document.getElementById('e-other').value = r.deposit_other || '';
-    document.getElementById('e-notes').value = r.notes || '';
-    document.getElementById('edit-date-label').textContent = 'Editing report for ' + date;
-    document.getElementById('edit-form').style.display = 'block';
-    status.textContent = '✓ Report loaded for ' + date;
-    status.style.color = 'var(--green)';
-    window._editingDate = date;
-  } catch(e) {
-    status.textContent = 'Failed to load: ' + e.message;
-  }
-}
-
-async function saveEditedReport() {
-  const date = window._editingDate;
-  if(!date) { showToast('No report loaded'); return; }
-  const getE = id => parseFloat(document.getElementById(id)?.value) || 0;
-  const salesTotal = getE('e-cash')+getE('e-credit')+getE('e-debit')+getE('e-ebt');
-  const payoutTotal = getE('e-pcash')+getE('e-lottery')+getE('e-game')+getE('e-lotref')+getE('e-atm')+getE('e-misc');
-  const depositTotal = getE('e-pos')+getE('e-dlottery')+getE('e-toy')+getE('e-coin')+getE('e-other');
-  const dbRec = {
-    store:'baileys', report_date:date,
-    sales_cash:getE('e-cash'), sales_credit:getE('e-credit'), sales_debit:getE('e-debit'),
-    sales_ebt:getE('e-ebt'), sales_tax:getE('e-tax'), sales_kitchen:getE('e-kitchen'),
-    sales_total:salesTotal,
-    payout_cash:getE('e-pcash'), payout_lottery:getE('e-lottery'), payout_game:getE('e-game'),
-    payout_lottery_refund:getE('e-lotref'), payout_atm:getE('e-atm'), payout_misc:getE('e-misc'),
-    payout_total:payoutTotal,
-    deposit_pos:getE('e-pos'), deposit_lottery:getE('e-dlottery'), deposit_toy:getE('e-toy'),
-    deposit_coin:getE('e-coin'), deposit_other:getE('e-other'), deposit_total:depositTotal,
-    notes:document.getElementById('e-notes').value,
-    updated_at:new Date().toISOString()
+// Clover helpers
+function cloverGet(apiPath, callback) {
+  const options = {
+    hostname: 'api.clover.com',
+    path: apiPath,
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${CLOVER_TOKEN}`, 'Content-Type': 'application/json' }
   };
-  try {
-    await apiPost('/api/daily', dbRec);
-    // Update local cache
-    const idx = dailyReports.findIndex(r => r.date === date);
-    const rec = {date, sales:{cash:getE('e-cash'),credit:getE('e-credit'),debit:getE('e-debit'),ebt:getE('e-ebt'),tax:getE('e-tax'),kitchen:getE('e-kitchen'),total:salesTotal},
-      payouts:{cash:getE('e-pcash'),lottery:getE('e-lottery'),game:getE('e-game'),lotteryRefund:getE('e-lotref'),atm:getE('e-atm'),misc:getE('e-misc'),total:payoutTotal},
-      deposit:{pos:getE('e-pos'),lottery:getE('e-dlottery'),toy:getE('e-toy'),coin:getE('e-coin'),other:getE('e-other'),total:depositTotal},
-      notes:document.getElementById('e-notes').value};
-    if(idx>=0) dailyReports[idx]=rec; else dailyReports.push(rec);
-    document.getElementById('edit-saved').style.display = 'inline';
-    setTimeout(()=>document.getElementById('edit-saved').style.display='none', 3000);
-    showToast('Report updated successfully');
-  } catch(e) { showToast('Save failed: ' + e.message); }
-}
-
-function showSaveConfirm() {
-  const date = document.getElementById('report-date').value;
-  if(!date) { showToast('Select a date first'); return; }
-  const fmt = v => '$' + Math.abs(parseFloat(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
-  const cashRows = [...document.querySelectorAll('.payout-amt')];
-  const cashPayout = cashRows.reduce((s,el) => s+(parseFloat(el.value)||0), 0);
-  const f = id => parseFloat(document.getElementById(id)?.value)||0;
-
-  // Build rows - only show if has value
-  const rows = [
-    {label:'Cash Sales', val:f('s-cash'), section:'sales'},
-    {divider:true, label:'Payouts'},
-    {label:'Cash Payouts Total', val:cashPayout, section:'payouts'},
-    {label:'Lottery Payout', val:f('p-lottery'), section:'payouts', allowNeg:true},
-    {label:'Game Machine Winner', val:f('p-game'), section:'payouts'},
-    {label:'Lottery Refund', val:f('p-lotref'), section:'payouts'},
-    {label:'ATM Balance Add', val:f('p-atm'), section:'payouts'},
-    {label:'Missing / Extra', val:f('p-misc'), section:'payouts', allowNeg:true},
-    {divider:true, label:'Cash Deposit'},
-    {label:'Cash from POS', val:f('d-pos'), section:'deposit'},
-    {label:'Lottery Kiosk Cash', val:f('d-lottery'), section:'deposit'},
-    {label:'Toy Machine Commission', val:f('d-toy'), section:'deposit'},
-    {label:'Coin Game Commission', val:f('d-coin'), section:'deposit'},
-    {label:'Other Cash', val:f('d-other'), section:'deposit'},
-  ];
-
-  // Calculate totals
-  const netSales = f('s-cash')+f('s-credit')+f('s-debit')+f('s-ebt')-f('s-tax');
-  const depositTotal = f('d-pos')+f('d-lottery')+f('d-toy')+f('d-coin')+f('d-other');
-  const expectedCash = f('s-cash') - cashPayout + f('p-lottery') - f('p-atm') + f('p-misc');
-  const variance = f('d-pos') - expectedCash;
-
-  let html = '';
-  let lastHadDivider = false;
-  rows.forEach(row => {
-    if(row.divider) {
-      lastHadDivider = true;
-      return;
-    }
-    const show = row.allowNeg ? row.val !== 0 : row.val > 0;
-    if(!show) return;
-    if(lastHadDivider) {
-      html += '<div style="height:0.5px;background:#e2e0d8;margin:10px 0"></div>';
-      lastHadDivider = false;
-    }
-    html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
-      <span style="color:#6b6860">${row.label}</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:500">${fmt(row.val)}</span>
-    </div>`;
-  });
-
-  // Add totals section
-  html += '<div style="height:0.5px;background:#e2e0d8;margin:10px 0"></div>';
-  html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
-    <span style="font-weight:600">Total Bank Deposit Today</span>
-    <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#1a5c3a">${fmt(depositTotal)}</span>
-  </div>`;
-  if(Math.abs(variance) >= 0.01 && f('s-cash') > 0) {
-    const isShort = variance < 0;
-    html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
-      <span style="${isShort?'color:#b83232;font-weight:600':'color:#6b6860'}">${isShort?'Cash Short':'Cash Over'}</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:${isShort?'#b83232':'#1a5c3a'}">${isShort?'-':''}${fmt(Math.abs(variance))}</span>
-    </div>`;
-  }
-
-  document.getElementById('save-confirm-date').textContent = 'Report for ' + date;
-  document.getElementById('save-confirm-body').innerHTML = html;
-  document.getElementById('save-confirm-modal').style.display = 'flex';
-}
-
-function proceedSaveReport() {
-  document.getElementById('save-confirm-modal').style.display = 'none';
-  window._skipOverwriteCheck = false;
-  submitDailyReport();
-}
-
-function loadDailySnapshot() {
-  const picker = document.getElementById('ls-date-picker');
-  const date = picker?.value;
-  const _months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  const _exclude = ['BOSS RECARGAS','Uncategorized','Misc'];
-  const report = date ? dailyReports.find(r=>r.date===date) : null;
-  const dateEl = document.getElementById('ls-date');
-  const catContainer = document.getElementById('ls-categories');
-
-  if(report) {
-    const dp = date.split('-');
-    dateEl.textContent = _months[parseInt(dp[1])-1] + ' ' + parseInt(dp[2]) + ', ' + dp[0];
-    const boss = (report.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;
-    const net = (report.sales?.cash||0)+(report.sales?.credit||0)+(report.sales?.debit||0)+(report.sales?.ebt||0)-(report.sales?.tax||0)-boss;
-    document.getElementById('ls-sales').textContent = fmtMoney(net);
-    const purch = invoices.filter(i=>i.date===date).reduce((s,i)=>s+i.amount,0);
-    document.getElementById('ls-purch').textContent = fmtMoney(purch);
-    const cats = (report.category_sales||[]).filter(c=>c.netSales>0&&!_exclude.includes(c.name)).sort((a,b)=>b.netSales-a.netSales).slice(0,5);
-    if(cats.length) {
-      const maxC = cats[0].netSales;
-      catContainer.innerHTML = cats.map(c => {
-        const pct = Math.round(c.netSales/maxC*100);
-        return `<div style="background:rgba(255,255,255,0.08);border-radius:7px;padding:8px 10px">
-          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
-            <span style="font-size:12px;color:rgba(255,255,255,0.85);font-weight:500">${c.name}</span>
-            <span style="font-family:var(--mono);font-size:12px;color:#a8e6c0">${fmtMoney(c.netSales)}</span>
-          </div>
-          <div style="height:3px;background:rgba(255,255,255,0.15);border-radius:2px">
-            <div style="width:${pct}%;height:100%;background:#a8e6c0;border-radius:2px"></div>
-          </div>
-        </div>`;
-      }).join('');
-    } else {
-      catContainer.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px">No category data for this date</div>';
-    }
-  } else {
-    dateEl.textContent = date ? 'No report found for this date' : '—';
-    document.getElementById('ls-sales').textContent = '$0.00';
-    document.getElementById('ls-purch').textContent = '$0.00';
-    catContainer.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px">No data</div>';
-  }
-}
-
-async function buildCatPickers() {
-  // Get all unique category names from all reports
-  const exclude = ['BOSS RECARGAS','Uncategorized','Misc'];
-  const allCats = new Set();
-  dailyReports.forEach(r => (r.category_sales||[]).filter(c=>!exclude.includes(c.name)&&c.netSales>0).forEach(c=>allCats.add(c.name)));
-  const cats = [...allCats].sort();
-  const opts = '<option value="">— None —</option>' + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
-  ['cat-pick-1','cat-pick-2','cat-pick-3'].forEach(id => {
-    const sel = document.getElementById(id);
-    if(!sel) return;
-    sel.innerHTML = opts;
-  });
-  // Load picks from server first, fallback to localStorage
-  let picks = [];
-  try {
-    const serverPicks = await apiGet('/api/settings?key=catPicks');
-    if(serverPicks && serverPicks.value) {
-      picks = JSON.parse(serverPicks.value);
-    } else {
-      const local = localStorage.getItem('catPicks');
-      if(local) picks = JSON.parse(local);
-    }
-  } catch(e) {
-    try { const local = localStorage.getItem('catPicks'); if(local) picks = JSON.parse(local); } catch(e2){}
-  }
-  picks.forEach((v,i) => { const el = document.getElementById(`cat-pick-${i+1}`); if(el) el.value=v||''; });
-  renderCatProjections();
-}
-
-function saveCatPicks() {
-  const picks = [1,2,3].map(i => document.getElementById(`cat-pick-${i}`)?.value||'');
-  try { localStorage.setItem('catPicks', JSON.stringify(picks)); } catch(e){}
-  // Save to server so it persists across devices
-  apiPost('/api/settings', {key:'catPicks', value:JSON.stringify(picks)}).catch(()=>{});
-  renderCatProjections();
-}
-
-function renderCatProjections() {
-  const ym = _dashMonth || new Date().toISOString().slice(0,7);
-  const monthReports = dailyReports.filter(r=>r.date&&r.date.startsWith(ym));
-  const picks = [1,2,3].map(i=>document.getElementById(`cat-pick-${i}`)?.value||'').filter(Boolean);
-  const el = document.getElementById('cat-proj-results');
-  if(!el) return;
-  if(!picks.length) { el.innerHTML='<div class="empty-state" style="padding:16px"><div>📊</div>Select categories above to track</div>'; return; }
-  const [yr,mo] = ym.split('-').map(Number);
-  const monthName = new Date(yr,mo-1,1).toLocaleString('default',{month:'long',year:'numeric'});
-  const [yr2, mo2] = ym.split('-').map(Number);
-  const daysInMo = new Date(yr2, mo2, 0).getDate();
-  const catColors = [
-    {bg:'#e8f4ed',border:'#b8dfc8',label:'#1a5c3a'},
-    {bg:'#eaf0fb',border:'#b8cef5',label:'#1a4a8a'},
-    {bg:'#fef3e2',border:'#f5c26b',label:'#b8600a'},
-  ];
-  el.innerHTML = picks.map((cat,ci) => {
-    const col = catColors[ci % catColors.length];
-    const total = monthReports.reduce((s,r) => {
-      const c = (r.category_sales||[]).find(c=>c.name===cat);
-      return s + (c?.netSales||0);
-    }, 0);
-    const days = monthReports.filter(r=>(r.category_sales||[]).some(c=>c.name===cat&&c.netSales>0)).length;
-    const avg = days > 0 ? total/days : 0;
-    const est = avg * daysInMo;
-    const pct = est > 0 ? Math.min(100, Math.round(total/est*100)) : 0;
-    return `<div style="padding:14px;background:${col.bg};border-radius:10px;margin-bottom:10px;border:0.5px solid ${col.border}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
-        <div style="font-size:14px;font-weight:600;color:${col.label}">${cat}</div>
-        <div style="font-size:11px;color:${col.label};opacity:0.7">${days} days · ${monthName}</div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.6);border-radius:7px">
-          <div style="font-size:10px;color:${col.label};text-transform:uppercase;font-weight:600;margin-bottom:3px;opacity:0.8">Actual MTD</div>
-          <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${col.label}">${fmtMoney(total)}</div>
-        </div>
-        <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.6);border-radius:7px">
-          <div style="font-size:10px;color:${col.label};text-transform:uppercase;font-weight:600;margin-bottom:3px;opacity:0.8">Avg / Day</div>
-          <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${col.label}">${fmtMoney(avg)}</div>
-        </div>
-        <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.8);border-radius:7px;border:0.5px solid ${col.border}">
-          <div style="font-size:10px;color:${col.label};text-transform:uppercase;font-weight:600;margin-bottom:3px;opacity:0.8">Est. Month</div>
-          <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${col.label}">${fmtMoney(est)}</div>
-        </div>
-      </div>
-      <div style="height:6px;background:rgba(255,255,255,0.5);border-radius:3px;overflow:hidden">
-        <div style="width:${pct}%;height:100%;background:${col.label};border-radius:3px;opacity:0.6;transition:width 0.5s"></div>
-      </div>
-      <div style="font-size:10px;color:${col.label};opacity:0.7;margin-top:4px;text-align:right">${pct}% of estimated</div>
-    </div>`;
-  }).join('');
-}
-
-// Vendor data stored locally + supabase eventually
-let vendorList = [];
-
-function selectInvPayType(val) {
-  document.getElementById('inv-paytype').value = val;
-  document.querySelectorAll('input[name="inv-pt"]').forEach(r => r.checked = r.value === val);
-  document.querySelectorAll('label[onclick^="selectInvPayType"]').forEach(l => {
-    const r = l.querySelector('input[type="radio"]');
-    l.style.borderColor = r?.value === val && val ? 'var(--green)' : 'var(--border2)';
-    l.style.background = r?.value === val && val ? 'var(--green-l)' : 'white';
-  });
-  document.getElementById('inv-check-row').style.display = val === 'check' ? 'block' : 'none';
-  if(val !== 'check') document.getElementById('inv-check-num').value = '';
-  // Auto-set status to Paid when pay type selected, Unpaid when cleared
-  const statusEl = document.getElementById('inv-status');
-  if(statusEl) statusEl.value = val ? 'paid' : 'unpaid';
-}
-
-function addVendor() {
-  const name = document.getElementById('vm-name').value.trim();
-  const type = document.getElementById('vm-type').value;
-  const notes = document.getElementById('vm-notes').value.trim();
-  if(!name) { showToast('Enter a vendor name'); return; }
-  if(vendorList.find(v=>v.name.toLowerCase()===name.toLowerCase())) { showToast('Vendor already exists'); return; }
-  vendorList.push({id: Date.now().toString(), name, type: type||'Purchase', notes});
-  saveVendorList();
-  document.getElementById('vm-name').value='';
-  document.getElementById('vm-type').value='';
-  document.getElementById('vm-notes').value='';
-  renderVendorList();
-  showToast('Vendor added');
-}
-
-function editVendor(id) {
-  const v = vendorList.find(x=>x.id===id);
-  if(!v) return;
-  // Toggle inline edit row
-  const row = document.getElementById('vm-edit-'+id);
-  if(row) { row.style.display = row.style.display==='none'?'block':'none'; return; }
-  renderVendorList(id); // re-render with edit open
-}
-function saveVendorEdit(id) {
-  const v = vendorList.find(x=>x.id===id);
-  if(!v) return;
-  v.name = document.getElementById('vme-name-'+id).value.trim() || v.name;
-  v.type = document.getElementById('vme-type-'+id).value || v.type;
-  v.notes = document.getElementById('vme-notes-'+id).value;
-  saveVendorList();
-  renderVendorList();
-  showToast('Vendor updated');
-}
-
-function deleteVendor(id) {
-  const v = vendorList.find(x=>x.id===id);
-  if(!v) return;
-  if(!confirm(`Delete vendor "${v.name}"? This won't delete their invoices.`)) return;
-  vendorList = vendorList.filter(x=>x.id!==id);
-  saveVendorList();
-  renderVendorList();
-  showToast('Vendor deleted');
-}
-
-function saveVendorList() {
-  try { localStorage.setItem('vendorList', JSON.stringify(vendorList)); } catch(e){}
-}
-
-function loadVendorData() {
-  try {
-    const saved = localStorage.getItem('vendorList');
-    if(saved) vendorList = JSON.parse(saved);
-    // Merge with invoice vendors
-    const invVendors = [...new Set(invoices.map(i=>i.vendor).filter(Boolean))];
-    invVendors.forEach(name => {
-      if(!vendorList.find(v=>v.name===name)) vendorList.push({id:name, name, type:'Purchase', notes:''});
+  const req = https.request(options, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try { callback(null, JSON.parse(data), res.statusCode); }
+      catch(e) { callback(e, null, res.statusCode); }
     });
-  } catch(e) {}
-}
-
-const VM_TYPES = ['Purchase','Repair','Office Supplies','Utilities','Services','Other'];
-function renderVendorList(openEditId='') {
-  const el = document.getElementById('vendor-list-body');
-  if(!el) return;
-  if(!vendorList.length) { el.innerHTML='<div class="empty-state"><div>🏪</div>No vendors yet</div>'; return; }
-  const grouped = {};
-  vendorList.forEach(v => { const t=v.type||'Purchase'; if(!grouped[t]) grouped[t]=[]; grouped[t].push(v); });
-  const typeOrder = ['Purchase','Repair','Office Supplies','Utilities','Services','Other'];
-  const sortedGroups = [...typeOrder.filter(t=>grouped[t]), ...Object.keys(grouped).filter(t=>!typeOrder.includes(t))];
-  el.innerHTML = sortedGroups.map(type => `
-    <div style="margin-bottom:14px">
-      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px;padding-bottom:4px;border-bottom:0.5px solid var(--border)">${type}</div>
-      ${(grouped[type]||[]).map(v=>`
-        <div style="border-bottom:0.5px solid var(--border)">
-          <div style="display:flex;align-items:center;gap:10px;padding:8px 0">
-            <div style="flex:1">
-              <div style="font-size:13px;font-weight:500">${v.name}</div>
-              ${v.notes?`<div style="font-size:11px;color:var(--muted)">${v.notes}</div>`:''}
-            </div>
-            <button class="item-save" onclick="editVendor('${v.id}')" style="background:var(--blue-l);color:var(--blue);border-color:var(--blue)">Edit</button>
-            <button class="item-save" onclick="deleteVendor('${v.id}')" style="background:var(--red-l);color:var(--red);border-color:var(--red)">Delete</button>
-          </div>
-          <div id="vm-edit-${v.id}" style="display:${v.id===openEditId?'block':'none'};background:var(--surface2);border-radius:8px;padding:12px;margin-bottom:8px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-              <div class="fgroup"><label>Name</label><input id="vme-name-${v.id}" type="text" value="${v.name}" style="font-family:var(--font);font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:6px;width:100%;outline:none"></div>
-              <div class="fgroup"><label>Type</label>
-                <select id="vme-type-${v.id}" style="font-family:var(--font);font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:6px;width:100%;outline:none;background:white">
-                  ${VM_TYPES.map(t=>`<option value="${t}" ${t===v.type?'selected':''}>${t}</option>`).join('')}
-                </select>
-              </div>
-            </div>
-            <div class="fgroup" style="margin-bottom:8px"><label>Notes</label><input id="vme-notes-${v.id}" type="text" value="${v.notes||''}" placeholder="Optional notes" style="font-family:var(--font);font-size:13px;padding:7px 9px;border:0.5px solid var(--border2);border-radius:6px;width:100%;outline:none"></div>
-            <div style="display:flex;gap:6px">
-              <button onclick="saveVendorEdit('${v.id}')" style="background:var(--green);color:white;border:none;padding:7px 16px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Save</button>
-              <button onclick="document.getElementById('vm-edit-${v.id}').style.display='none'" style="background:none;border:0.5px solid var(--border2);padding:7px 12px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer">Cancel</button>
-            </div>
-          </div>
-        </div>`).join('')}
-    </div>`).join('');
-}
-
-function exportInvoicesCSV() {
-  const headers = ['Date','Invoice #','Vendor','Type','Amount','Status','Pay Type','Check #','Paid Date','Notes'];
-  const rows = invoices.map(inv => {
-    const type = vendorList.find(v=>v.name===inv.vendor)?.type||'';
-    return [
-      inv.date||'', inv.num||'', inv.vendor||'', type,
-      inv.amount||0, inv.status||'', inv.paytype||'',
-      inv.checkNumber||'', inv.paidDate||'', (inv.notes||'').replace(/,/g,' ')
-    ];
   });
-  const csv = [headers, ...rows].map(r=>r.join(',')).join('
-');
-  const blob = new Blob([csv], {type:'text/csv'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `baileys-invoices-${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showToast('Invoices exported to CSV');
+  req.on('error', callback);
+  req.end();
 }
 
-function updateBusinessIntelligence() {
-  const el = document.getElementById('bi-body');
-  if(!el) return;
-  if(dailyReports.length < 5) {
-    el.innerHTML = '<div class="empty-state"><div>📊</div>Save at least 5 daily reports to unlock insights</div>';
+function cloverPost(cloverPath, body, callback) {
+  const bodyStr = JSON.stringify(body);
+  const options = {
+    hostname: 'api.clover.com',
+    path: `/v3/merchants/${MERCHANT_ID}${cloverPath}`,
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLOVER_TOKEN}`,
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(bodyStr)
+    }
+  };
+  const req = https.request(options, (res) => {
+    let data = '';
+    res.on('data', chunk => data += chunk);
+    res.on('end', () => {
+      try { callback(null, JSON.parse(data), res.statusCode); }
+      catch(e) { callback(e, null, res.statusCode); }
+    });
+  });
+  req.on('error', callback);
+  req.write(bodyStr);
+  req.end();
+}
+
+function fetchDevices(callback) {
+  cloverGet(`/v3/merchants/${MERCHANT_ID}/devices?limit=50`, (err, data) => {
+    if(err) { callback(err, []); return; }
+    callback(null, data.elements || []);
+  });
+}
+
+
+// Fetch category sales from orders for a date range
+function fetchOrderCategories(startMs, endMs, callback) {
+  let allOrders = [];
+  let offset = 0;
+  const limit = 500;
+  const MAX_PAGES = 10;
+  let page = 0;
+
+  function fetchPage() {
+    if (page >= MAX_PAGES) { callback(null, allOrders); return; }
+    page++;
+    const apiPath = `/v3/merchants/${MERCHANT_ID}/orders?` +
+      `filter=createdTime>=${startMs}&filter=createdTime<=${endMs}` +
+      `&expand=lineItems&limit=${limit}&offset=${offset}`;
+    cloverGet(apiPath, (err, data) => {
+      if (err) { callback(err, null); return; }
+      const elements = data.elements || [];
+      allOrders = allOrders.concat(elements);
+      if (elements.length === limit) { offset += limit; fetchPage(); }
+      else { callback(null, allOrders); }
+    });
+  }
+  fetchPage();
+}
+
+function aggregateCategories(orders) {
+  const cats = {};
+  orders.forEach(order => {
+    if (order.state === 'OPEN' || !order.lineItems) return;
+    (order.lineItems.elements || []).forEach(item => {
+      if (item.refunded) return;
+      const catName = item.itemGroup?.name || 'Uncategorized';
+      const netAmt = ((item.price || 0) * (item.quantity || 1) - (item.discountAmount || 0)) / 100;
+      if (!cats[catName]) cats[catName] = { name: catName, netSales: 0, qty: 0 };
+      cats[catName].netSales += netAmt;
+      cats[catName].qty += (item.quantity || 1);
+    });
+  });
+  return Object.values(cats)
+    .filter(c => c.netSales > 0)
+    .sort((a, b) => b.netSales - a.netSales)
+    .map(c => ({ ...c, netSales: +c.netSales.toFixed(2) }));
+}
+
+
+
+function fetchCategoryMap(callback) {
+  let allCats = [];
+  let offset = 0;
+  const limit = 200;
+  function fetchPage() {
+    cloverGet(`/v3/merchants/${MERCHANT_ID}/categories?expand=items&limit=${limit}&offset=${offset}`, (err, data) => {
+      if (err) { callback(err, null); return; }
+      const elements = data.elements || [];
+      allCats = allCats.concat(elements);
+      if (elements.length === limit) { offset += limit; fetchPage(); }
+      else {
+        const map = {};
+        allCats.forEach(cat => {
+          (cat.items?.elements||[]).forEach(item => { if(!map[item.id]) map[item.id] = cat.name; });
+        });
+        callback(null, map);
+      }
+    });
+  }
+  fetchPage();
+}
+
+function fetchOrderCategories(startMs, endMs, callback) {
+  let allOrders = [];
+  let offset = 0;
+  const limit = 500;
+  let page = 0;
+  function fetchPage() {
+    if(page >= 10) { callback(null, allOrders); return; }
+    page++;
+    cloverGet(`/v3/merchants/${MERCHANT_ID}/orders?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=lineItems&limit=${limit}&offset=${offset}`, (err, data) => {
+      if(err) { callback(err, null); return; }
+      const elements = data.elements || [];
+      allOrders = allOrders.concat(elements);
+      if(elements.length === limit) { offset += limit; fetchPage(); }
+      else { callback(null, allOrders); }
+    });
+  }
+  fetchPage();
+}
+
+function aggregateCategories(orders, catMap) {
+  const cats = {};
+  orders.forEach(order => {
+    if(order.state === 'OPEN' || !order.lineItems) return;
+    (order.lineItems.elements||[]).forEach(item => {
+      if(item.refunded || item.exchanged) return;
+      const itemId = item.item?.id || '';
+      const catName = (itemId && catMap[itemId]) ? catMap[itemId] : 'Uncategorized';
+      const netAmt = ((item.price||0)/100 * (item.quantity||1)) - ((item.discountAmount||0)/100);
+      if(netAmt <= 0) return;
+      if(!cats[catName]) cats[catName] = {name:catName, netSales:0, qty:0};
+      cats[catName].netSales += netAmt;
+      cats[catName].qty += (item.quantity||1);
+    });
+  });
+  return Object.values(cats)
+    .filter(c => c.netSales > 0)
+    .sort((a,b) => b.netSales - a.netSales)
+    .map(c => ({...c, netSales:+c.netSales.toFixed(2), qty:+c.qty.toFixed(2)}));
+}
+
+function buildSummaryResponse(date, startMs, endMs, done) {
+  const KITCHEN_ID = 'cc044434-defb-0585-8547-a52227f9f17c';
+  // Step 1: fetch payments
+  fetchAllPayments(startMs, endMs, (err, payments) => {
+    if (err) { done(err, null); return; }
+    const pmnts = payments.filter(p => p.result === 'SUCCESS');
+    let cash=0, credit=0, debit=0, ebt=0, tax=0, total=0;
+    let kCash=0, kCredit=0, kDebit=0, kEbt=0, kTax=0, kTotal=0;
+    pmnts.forEach(p => {
+      const amt = (p.amount||0)/100;
+      const refunded = (p.refunds?.elements||[]).reduce((s,r)=>(s+(r.amount||0)/100),0);
+      const netAmt = amt - refunded;
+      const taxAmt = (p.taxAmount||0)/100;
+      const tender = (p.tender?.label||'').toLowerCase();
+      const tKey = (p.tender?.labelKey||'').toLowerCase();
+      tax += Math.round(taxAmt*100); total += netAmt;
+      if(tKey.includes('cash')||tender.includes('cash')) cash += netAmt;
+      else if(tKey.includes('debit')||tender.includes('debit')) debit += netAmt;
+      else if(tKey.includes('credit')||tender.includes('credit')) credit += netAmt;
+      else if(tKey.includes('ebt')||tender.includes('ebt')) ebt += netAmt;
+      if(p.device?.id === KITCHEN_ID) {
+        kTax += Math.round(taxAmt*100); kTotal += netAmt;
+        if(tKey.includes('cash')||tender.includes('cash')) kCash += netAmt;
+        else if(tKey.includes('debit')||tender.includes('debit')) kDebit += netAmt;
+        else if(tKey.includes('credit')||tender.includes('credit')) kCredit += netAmt;
+        else if(tKey.includes('ebt')||tender.includes('ebt')) kEbt += netAmt;
+      }
+    });
+    const taxAmt = +(tax/100).toFixed(2);
+    const kTaxAmt = +(kTax/100).toFixed(2);
+    // Step 2: fetch category map
+    fetchCategoryMap((mapErr, catMap) => {
+      const cMap = mapErr ? {} : (catMap||{});
+      // Step 3: fetch orders for category breakdown
+      fetchOrderCategories(startMs, endMs, (catErr, orders) => {
+        const categories = catErr ? [] : aggregateCategories(orders||[], cMap);
+        done(null, {
+          date, count: pmnts.length,
+          cash:+cash.toFixed(2), credit:+credit.toFixed(2),
+          debit:+debit.toFixed(2), ebt:+ebt.toFixed(2),
+          tax: taxAmt, netSales: +(total - taxAmt).toFixed(2), grossSales: +total.toFixed(2),
+          kitchen:{
+            cash:+kCash.toFixed(2), credit:+kCredit.toFixed(2),
+            debit:+kDebit.toFixed(2), ebt:+kEbt.toFixed(2),
+            tax: kTaxAmt, total:+kTotal.toFixed(2), netSales:+(kTotal-kTaxAmt).toFixed(2)
+          },
+          categories: categories
+        });
+      });
+    });
+  });
+}
+
+function fetchAllPayments(startMs, endMs, callback) {
+  let allPayments = [];
+  let offset = 0;
+  const limit = 1000;
+  const MAX_PAGES = 20;
+  let page = 0;
+  function fetchPage() {
+    if (page >= MAX_PAGES) { callback(null, allPayments); return; }
+    page++;
+    const apiPath = `/v3/merchants/${MERCHANT_ID}/payments?filter=createdTime>=${startMs}&filter=createdTime<=${endMs}&expand=tender,device,refunds&limit=${limit}&offset=${offset}`;
+    cloverGet(apiPath, (err, data, status) => {
+      if (err) { callback(err, null); return; }
+      const elements = data.elements || [];
+      allPayments = allPayments.concat(elements);
+      if (elements.length === limit) { offset += limit; fetchPage(); }
+      else { callback(null, allPayments); }
+    });
+  }
+  fetchPage();
+}
+
+function getBody(req, callback) {
+  let body = '';
+  req.on('data', chunk => body += chunk);
+  req.on('end', () => {
+    try { callback(null, JSON.parse(body || '{}')); }
+    catch(e) { callback(e, null); }
+  });
+}
+
+const server = http.createServer((req, res) => {
+  const parsed = url.parse(req.url, true);
+  const pathname = parsed.pathname;
+
+  // Serve main app
+  if (req.method === 'GET' && (pathname === '/' || pathname === '/index.html')) {
+    const filePath = path.join(__dirname, 'public', 'index.html');
+    fs.readFile(filePath, (err, data) => {
+      if (err) { res.writeHead(404); res.end('App not found'); return; }
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.end(data);
+    });
     return;
   }
-  const ym = _dashMonth || new Date().toISOString().slice(0,7);
-  const monthReports = dailyReports.filter(r=>r.date&&r.date.startsWith(ym));
-  const allReports = [...dailyReports].sort((a,b)=>a.date.localeCompare(b.date));
-  const exclude = ['BOSS RECARGAS','Uncategorized','Misc'];
 
-  // Day of week analysis (0=Mon...6=Sun)
-  const dowNames = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-  const dowSales = Array(7).fill(0);
-  const dowCount = Array(7).fill(0);
-  allReports.forEach(r => {
-    const d = new Date(r.date+'T12:00:00');
-    const dow = (d.getDay()+6)%7; // Mon=0
-    const boss = (r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;
-    const net = (r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;
-    dowSales[dow] += net;
-    dowCount[dow]++;
-  });
-  const dowAvg = dowSales.map((s,i)=>dowCount[i]>0?s/dowCount[i]:0);
-  const maxDow = Math.max(...dowAvg);
-  const minDow = Math.min(...dowAvg.filter(v=>v>0));
-  const bestDay = dowNames[dowAvg.indexOf(maxDow)];
-  const worstDay = dowNames[dowAvg.findIndex(v=>v===minDow)];
+  setCORS(req, res);
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  // Top categories this month
-  const catTotals = {};
-  monthReports.forEach(r=>(r.category_sales||[]).filter(c=>!exclude.includes(c.name)).forEach(c=>{
-    if(!catTotals[c.name]) catTotals[c.name]=0;
-    catTotals[c.name]+=c.netSales||0;
-  }));
-  const topCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,3);
-  const totalCatSales = Object.values(catTotals).reduce((s,v)=>s+v,0);
+  const json = (data, status) => {
+    res.writeHead(status || 200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify(data));
+  };
 
-  // Month over month trend (last 2 months)
-  const now = new Date();
-  const prevYm = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
-  const prevReports = dailyReports.filter(r=>r.date&&r.date.startsWith(prevYm));
-  const curSales = monthReports.reduce((s,r)=>{const boss=(r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;return s+(r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;},0);
-  const prevSales = prevReports.reduce((s,r)=>{const boss=(r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;return s+(r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;},0);
-  const momPct = prevSales>0?((curSales-prevSales)/prevSales*100).toFixed(1):null;
-
-  // Cash vs card ratio
-  const totalCash = allReports.reduce((s,r)=>s+(r.sales?.cash||0),0);
-  const totalCard = allReports.reduce((s,r)=>s+(r.sales?.credit||0)+(r.sales?.debit||0),0);
-  const cashPct = (totalCash+totalCard)>0?Math.round(totalCash/(totalCash+totalCard)*100):0;
-
-  // Build HTML
-  const [yr2,mo2] = ym.split('-').map(Number);
-  const monthName = new Date(yr2,mo2-1,1).toLocaleString('default',{month:'long',year:'numeric'});
-
-  let html = '';
-
-  // Day of week chart
-  html += `<div style="margin-bottom:18px">
-    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">📅 Sales by Day of Week (All Time Avg)</div>
-    ${dowAvg.map((avg,i)=>{
-      const pct=maxDow>0?Math.round(avg/maxDow*100):0;
-      const isBest=avg===maxDow;
-      const isWorst=avg===minDow&&avg>0;
-      return `<div class="bar-row">
-        <div class="bar-label" style="font-size:12px;${isBest?'color:var(--green);font-weight:600':''}${isWorst?'color:var(--red)':''}">${dowNames[i].slice(0,3)}</div>
-        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${isBest?'var(--green)':isWorst?'var(--red-l)':'var(--green-m)'}"></div></div>
-        <div class="bar-val" style="font-size:12px;${isBest?'color:var(--green);font-weight:600':''}">${avg>0?fmtMoney(avg):'—'}</div>
-      </div>`;
-    }).join('')}
-  </div>`;
-
-  // Key insights
-  html += `<div style="margin-bottom:18px">
-    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">💡 Key Insights</div>
-    <div style="display:flex;flex-direction:column;gap:8px">`;
-
-  // Best/worst day
-  html += `<div style="padding:10px 12px;background:var(--green-l);border-radius:8px;border:0.5px solid var(--green-m)">
-    <div style="font-size:12px;font-weight:600;color:var(--green)">🏆 Best Day: ${bestDay}</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px">Avg ${fmtMoney(maxDow)} · Consider stocking up and scheduling more staff on ${bestDay}s</div>
-  </div>`;
-  html += `<div style="padding:10px 12px;background:var(--red-l);border-radius:8px;border:0.5px solid #f09595">
-    <div style="font-size:12px;font-weight:600;color:var(--red)">📉 Slowest Day: ${worstDay}</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px">Avg ${fmtMoney(minDow)} · Use ${worstDay}s for restocking, deep cleaning, vendor meetings</div>
-  </div>`;
-
-  // Month trend
-  if(momPct !== null) {
-    const up = parseFloat(momPct)>=0;
-    html += `<div style="padding:10px 12px;background:${up?'var(--green-l)':'var(--amber-l)'};border-radius:8px;border:0.5px solid ${up?'var(--green-m)':'#f5c26b'}">
-      <div style="font-size:12px;font-weight:600;color:${up?'var(--green)':'var(--amber)'}">${up?'📈':'📉'} Month vs Last Month: ${up?'+':''}${momPct}%</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:2px">${up?'Sales are trending up. Maintain current stock levels and promotions.':'Sales dipped vs last month. Review top categories and consider promotions.'}</div>
-    </div>`;
+  if (req.method === 'GET' && pathname === '/api/debug-devices') {
+    fetchDevices((err, devices) => {
+      if(err) { json({error: err.message}, 500); return; }
+      json({devices: devices.map(d => ({id:d.id, name:d.name, model:d.model}))});
+    });
+    return;
   }
 
-  // Cash vs card
-  html += `<div style="padding:10px 12px;background:var(--surface2);border-radius:8px;border:0.5px solid var(--border)">
-    <div style="font-size:12px;font-weight:600;color:var(--text)">💵 Payment Mix: ${cashPct}% Cash · ${100-cashPct}% Card</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px">${cashPct>70?'Heavy cash business — ensure safe is managed daily and deposits are timely.':cashPct>50?'Balanced mix — good for reducing cash handling risk.':'Card-heavy — lower cash handling risk but monitor processing fees.'}</div>
-  </div>`;
-
-  // Top categories driving sales
-  if(topCats.length) {
-    const topPct = totalCatSales>0?Math.round(topCats[0][1]/totalCatSales*100):0;
-    html += `<div style="padding:10px 12px;background:var(--blue-l);border-radius:8px;border:0.5px solid #b8cef5">
-      <div style="font-size:12px;font-weight:600;color:var(--blue)">🛒 Sales Drivers in ${monthName}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">${topCats.map(([name,val])=>`<span style="font-weight:500;color:var(--text)">${name}</span> ${fmtMoney(val)}`).join(' · ')}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:3px">${topCats[0][0]} alone accounts for ${topPct}% of tracked sales. ${topPct>40?`High concentration — consider expanding ${topCats[1]?topCats[1][0]:'other categories'} to reduce dependency.`:'Well-diversified category mix.'}</div>
-    </div>`;
+  // ---- HEALTH ----
+  if (pathname === '/health') {
+    json({status: 'ok', store: "Bailey's Market", time: new Date().toISOString()});
+    return;
   }
 
-  // Action recommendations
-  html += `<div style="padding:10px 12px;background:#f0eafa;border-radius:8px;border:0.5px solid #c8b0e8">
-    <div style="font-size:12px;font-weight:600;color:#5a3a8a">🎯 Recommendations for Bailey's</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.7">
-      • <strong>Stock up on ${topCats[0]?topCats[0][0]:'top categories'}</strong> — your biggest revenue driver<br>
-      • <strong>Schedule extra staff on ${bestDay}s</strong> — your peak day<br>
-      • <strong>Run promotions on ${worstDay}s</strong> — to lift your slowest day<br>
-      • <strong>Track purchases vs sales margin</strong> — aim to keep purchases under 65% of net sales<br>
-      • <strong>Monitor cash deposits daily</strong> — ${cashPct}% of your sales are cash
-    </div>
-  </div>`;
+  // ---- CLOVER SUMMARY ----
+  if (req.method === 'GET' && pathname === '/api/summary') {
+    const date = parsed.query.date || new Date().toISOString().split('T')[0];
+    const [yyyy, mm, dd] = date.split('-').map(Number);
+    const startMs = Date.UTC(yyyy, mm-1, dd, 4, 0, 0);
+    const endMs   = Date.UTC(yyyy, mm-1, dd+1, 3, 59, 59);
+    buildSummaryResponse(date, startMs, endMs, (err, result) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(result);
+    });
+    return;
+  }
 
-  html += '</div></div>';
-  el.innerHTML = html;
-}
+  // ---- CLOVER ITEMS ----
+  if (req.method === 'GET' && pathname === '/api/items') {
+    const q = parsed.query.q || '';
+    cloverGet(`/v3/merchants/${MERCHANT_ID}/items?filter=name%20like%20%22%25${encodeURIComponent(q)}%25%22&limit=20`, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
 
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-</script>
-</body>
-</html>
+  // ---- UPDATE PRICE ----
+  if (req.method === 'POST' && pathname.match(/^\/api\/items\/[^/]+\/price$/)) {
+    const itemId = pathname.split('/')[3];
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      cloverPost(`/items/${itemId}`, {price: Math.round(body.price * 100)}, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  // ---- DAILY REPORTS ----
+  // GET /api/daily?month=2026-04  or  GET /api/daily/:date
+  if (req.method === 'GET' && pathname === '/api/daily') {
+    const month = parsed.query.month;
+    const date = parsed.query.date;
+    let query = '?store=eq.baileys&order=report_date.desc';
+    if (date) query = `?store=eq.baileys&report_date=eq.${date}`;
+    else if (month) { const [yr,mo]=month.split('-').map(Number); const nm=mo===12?`${yr+1}-01`:`${yr}-${String(mo+1).padStart(2,'0')}`; query=`?store=eq.baileys&report_date=gte.${month}-01&report_date=lt.${nm}-01&order=report_date.desc`; }
+    supabase('GET', 'daily_reports', query, null, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  // POST /api/daily — save or update daily report
+  if (req.method === 'POST' && pathname === '/api/daily') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      // Upsert by report_date
+      supabase('POST', 'daily_reports', '?on_conflict=report_date', body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  // ---- MACHINE REPORTS ----
+  if (req.method === 'GET' && pathname === '/api/machines') {
+    const month = parsed.query.month;
+    const date = parsed.query.date;
+    let query = '?store=eq.baileys&order=report_date.desc&limit=1';
+    if (date) query = `?store=eq.baileys&report_date=eq.${date}`;
+    else if (month) { const [yr,mo]=month.split('-').map(Number); const nm=mo===12?`${yr+1}-01`:`${yr}-${String(mo+1).padStart(2,'0')}`; query=`?store=eq.baileys&report_date=gte.${month}-01&report_date=lt.${nm}-01&order=report_date.desc`; }
+    supabase('GET', 'machine_reports', query, null, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/machines') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('POST', 'machine_reports', '?on_conflict=report_date', body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  // ---- INVOICES ----
+  if (req.method === 'GET' && pathname === '/api/invoices') {
+    const vendor = parsed.query.vendor;
+    const status = parsed.query.status;
+    let query = '?store=eq.baileys&order=created_at.desc';
+    if (vendor) query += `&vendor=ilike.*${vendor}*`;
+    if (status && status !== 'all') query += `&status=eq.${status}`;
+    supabase('GET', 'invoices', query, null, (err, data, status2) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status2);
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/invoices') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('POST', 'invoices', '', body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  if (req.method === 'PUT' && pathname.match(/^\/api\/invoices\/[^/]+$/)) {
+    const invId = pathname.split('/')[3];
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('PATCH', 'invoices', `?id=eq.${invId}`, body, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  // ---- SPECIALTY CATEGORIES ----
+  if (req.method === 'GET' && pathname === '/api/categories') {
+    supabase('GET', 'specialty_categories', '?store=eq.baileys&active=eq.true&order=id', null, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/api/categories') {
+    getBody(req, (err, body) => {
+      if (err) { json({error: 'Invalid body'}, 400); return; }
+      supabase('POST', 'specialty_categories', '', {store: 'baileys', name: body.name}, (err, data, status) => {
+        if (err) { json({error: err.message}, 500); return; }
+        json(data, status);
+      });
+    });
+    return;
+  }
+
+  if (req.method === 'DELETE' && pathname.match(/^\/api\/categories\/[^/]+$/)) {
+    const catId = pathname.split('/')[3];
+    supabase('PATCH', 'specialty_categories', `?id=eq.${catId}`, {active: false}, (err, data, status) => {
+      if (err) { json({error: err.message}, 500); return; }
+      json(data, status);
+    });
+    return;
+  }
+
+  // 404
+  json({error: 'Not found'}, 404);
+});
+
+server.listen(PORT, () => {
+  console.log(`Bailey's Market server running on port ${PORT}`);
+});
