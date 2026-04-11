@@ -252,9 +252,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         <div class="page-sub">Enter today's sales, payouts, and cash activity</div>
       </div>
 
+      <div id="store-open-warning" style="display:none;background:#fef3e2;border:0.5px solid #f5c26b;border-radius:var(--r);padding:10px 15px;margin-bottom:10px;font-size:13px;color:#b8600a;font-weight:500">
+        ⚠ Store is still open — data pulled is only until <span id="warning-time"></span> EST. Save only after store closes.
+      </div>
       <div class="date-bar">
         <label>Report Date</label>
-        <input type="date" id="report-date" onchange="checkExistingReport()">
+        <input type="date" id="report-date" onchange="checkExistingReport(); checkStoreOpenWarning();">
         <span id="report-exists-badge" style="display:none;font-size:12px;padding:4px 10px;background:var(--green-l);color:var(--green);border-radius:20px;font-weight:500"></span>
         <div class="clover-btn" onclick="parseCloverCSV()" id="clover-pull-btn">
           <span>↓</span> Pull from Clover
@@ -821,6 +824,7 @@ async function init() {
   renderInvoices();
   updateDashboard();
   loadVendorList();
+  checkStoreOpenWarning();
 }
 
 // ---- CLOVER DIRECT PULL ----
@@ -830,20 +834,8 @@ async function parseCloverCSV() {
   const date = document.getElementById('report-date').value;
   if(!date) { showToast('Select a date first'); return; }
 
-  // Show info warning if pulling today's data before 11pm EST (no blocking)
-  const nowEST = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
-  const todayEST = nowEST.toISOString().split('T')[0];
-  if(date === todayEST && nowEST.getHours() < 23) {
-    const hour = nowEST.getHours();
-    const min = nowEST.getMinutes();
-    const timeStr = `${hour % 12 || 12}:${min.toString().padStart(2,'0')} ${hour >= 12 ? 'PM' : 'AM'} EST`;
-    const status = document.getElementById('clover-status');
-    status.textContent = `⚠ Store still open — data until ${timeStr}`;
-    status.className = 'clover-status';
-    status.style.display = 'inline-block';
-    status.style.background = 'var(--warn-light,#fef3e2)';
-    status.style.color = 'var(--warn,#b8600a)';
-  }
+  // Show warning bar if pulling today's data before 11pm EST
+  checkStoreOpenWarning();
   btn.innerHTML = '<span>⟳</span> Pulling...';
   btn.style.opacity = '0.7';
   status.style.display = 'none';
@@ -1280,7 +1272,25 @@ async function saveMachines() {
 
 // ---- DAILY REPORT SAVE ----
 
-async function checkExistingReport() {
+async 
+function checkStoreOpenWarning() {
+  const date = document.getElementById('report-date').value;
+  const nowEST = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+  const todayEST = nowEST.toISOString().split('T')[0];
+  const warningBar = document.getElementById('store-open-warning');
+  if(!warningBar) return;
+  if(date === todayEST && nowEST.getHours() < 23) {
+    const hour = nowEST.getHours();
+    const min = nowEST.getMinutes();
+    const timeStr = `${hour % 12 || 12}:${min.toString().padStart(2,'0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+    document.getElementById('warning-time').textContent = timeStr;
+    warningBar.style.display = 'block';
+  } else {
+    warningBar.style.display = 'none';
+  }
+}
+
+function checkExistingReport() {
   const date = document.getElementById('report-date').value;
   if(!date) return;
   try {
