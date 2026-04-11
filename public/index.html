@@ -579,34 +579,81 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
     <div class="page" id="page-dashboard">
       <div class="page-header">
         <div class="page-title">Dashboard</div>
-        <div class="page-sub" id="dash-sub">Month to date — Bailey's Market</div>
-      </div>
-      <div class="dash-grid four">
-        <div class="metric"><div class="metric-label">Net Sales MTD</div><div class="metric-val green" id="d-sales-mtd">$0</div><div class="metric-sub" id="d-sales-days">0 days recorded</div></div>
-        <div class="metric"><div class="metric-label">Net Purchases MTD</div><div class="metric-val amber" id="d-purch-mtd">$0</div><div class="metric-sub">From invoices</div></div>
-        <div class="metric"><div class="metric-label">Est. Month Sales</div><div class="metric-val" id="d-sales-est">$0</div><div class="metric-sub">Based on daily avg</div></div>
-        <div class="metric"><div class="metric-label">Est. Month Purchases</div><div class="metric-val" id="d-purch-est">$0</div><div class="metric-sub">Based on daily avg</div></div>
-      </div>
-      <div class="dash-grid">
-        <div class="metric"><div class="metric-label">Profit Margin</div><div class="metric-val green" id="d-margin">—</div><div class="metric-sub">Sales minus purchases</div></div>
-        <div class="metric"><div class="metric-label">Avg Daily Sale</div><div class="metric-val" id="d-avg-sale">$0</div><div class="metric-sub">This month</div></div>
-        <div class="metric"><div class="metric-label">Machine Income MTD</div><div class="metric-val green" id="d-machine-inc">$0</div><div class="metric-sub">60% of net</div></div>
-        <div class="metric"><div class="metric-label">Unpaid Invoices</div><div class="metric-val amber" id="d-unpaid-amt">$0</div><div class="metric-sub" id="d-unpaid-count">0 invoices</div></div>
+        <div class="page-sub">Bailey's Market — Live snapshot &amp; monthly summary</div>
       </div>
 
-      <!-- SPECIALTY PROJECTIONS -->
+      <!-- SECTION 1: LAST SAVED REPORT -->
+      <div style="background:var(--green);border-radius:var(--r);padding:15px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:10px">Last Saved Report</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px">
+          <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px">Date</div>
+            <div style="font-size:18px;font-weight:600;color:white;font-family:var(--mono)" id="ls-date">—</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px">Net Sales</div>
+            <div style="font-size:18px;font-weight:600;color:#a8e6c0;font-family:var(--mono)" id="ls-sales">$0.00</div>
+          </div>
+          <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px">
+            <div style="font-size:11px;color:rgba(255,255,255,0.6);margin-bottom:4px">Total Purchases</div>
+            <div style="font-size:18px;font-weight:600;color:#ffd864;font-family:var(--mono)" id="ls-purch">$0.00</div>
+          </div>
+        </div>
+        <!-- Top 5 categories from last report -->
+        <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.6);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Top 5 Categories</div>
+        <div id="ls-categories" style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+          <div style="color:rgba(255,255,255,0.4);font-size:12px">No category data yet</div>
+        </div>
+      </div>
+
+      <!-- SECTION 2: MONTHLY SUMMARY -->
+      <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:15px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <div style="font-size:13px;font-weight:600">Monthly Summary</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button onclick="changeMonth(-1)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--font);font-size:13px">‹</button>
+            <span style="font-size:13px;font-weight:500;min-width:90px;text-align:center" id="d-month-label">—</span>
+            <button onclick="changeMonth(1)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:var(--font);font-size:13px">›</button>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div class="metric"><div class="metric-label">Total Net Sales</div><div class="metric-val green" id="d-sales-mtd">$0</div><div class="metric-sub" id="d-sales-days">0 days recorded</div></div>
+          <div class="metric"><div class="metric-label">Total Purchases</div><div class="metric-val amber" id="d-purch-mtd">$0</div><div class="metric-sub">From invoices</div></div>
+          <div class="metric"><div class="metric-label">Profit Margin</div><div class="metric-val green" id="d-margin">—</div><div class="metric-sub">(Sales - Purchases) / Sales</div></div>
+          <div class="metric"><div class="metric-label">Machine Income</div><div class="metric-val green" id="d-machine-inc">$0</div><div class="metric-sub">60% of net take out</div></div>
+          <div class="metric"><div class="metric-label">Avg Daily Sale</div><div class="metric-val" id="d-avg-sale">$0</div><div class="metric-sub">Net Sales / Days recorded</div></div>
+          <div class="metric"><div class="metric-label">Avg Daily Purchase</div><div class="metric-val" id="d-avg-purch">$0</div><div class="metric-sub">Purchases / Days recorded</div></div>
+        </div>
+
+        <div style="background:var(--amber-l);border:0.5px solid #f5c26b;border-radius:8px;padding:12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div style="font-size:12px;color:var(--amber);font-weight:600;text-transform:uppercase;letter-spacing:0.3px">Unpaid Invoices</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px" id="d-unpaid-count">0 invoices</div>
+          </div>
+          <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber)" id="d-unpaid-amt">$0</div>
+        </div>
+
+        <!-- Top 5 categories for the month -->
+        <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Top 5 Categories This Month</div>
+        <div id="d-top-cats">
+          <div class="empty-state" style="padding:16px"><div>📊</div>No category data for this month</div>
+        </div>
+      </div>
+
+      <!-- SECTION 3: CATEGORY PROJECTIONS (placeholder) -->
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
           <div class="card-icon" style="background:#fef3e2">📈</div>
           <div class="card-title">Category Projections</div>
-          <div class="card-chevron open">▼</div>
+          <div class="card-chevron">▼</div>
         </div>
-        <div class="card-body open" id="cat-proj-body">
-          <div class="empty-state"><div>📊</div>Enter specialty category data in Daily Report to see projections</div>
+        <div class="card-body" id="cat-proj-body">
+          <div class="empty-state"><div>📊</div>Coming soon</div>
         </div>
       </div>
 
-      <!-- SALES BAR -->
+      <!-- SECTION 4: THIS WEEK -->
       <div class="chart-bar-wrap">
         <div class="chart-title">This Week — Daily Sales</div>
         <div id="weekly-bars"><div class="empty-state" style="padding:20px">No data yet</div></div>
@@ -1849,45 +1896,113 @@ function renderInvoices() {
 }
 
 // ---- DASHBOARD ----
+// Track current dashboard month
+let _dashMonth = null;
+function changeMonth(dir) {
+  const parts = _dashMonth.split('-');
+  const d = new Date(parseInt(parts[0]), parseInt(parts[1])-1+dir, 1);
+  _dashMonth = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  updateDashboard();
+}
+
 function updateDashboard() {
   const now = new Date();
-  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  if(!_dashMonth) _dashMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const ym = _dashMonth;
+  const [yr, mo] = ym.split('-').map(Number);
+  const monthName = new Date(yr, mo-1, 1).toLocaleString('default',{month:'long',year:'numeric'});
+  document.getElementById('d-month-label').textContent = monthName;
+
+  // --- SECTION 1: Last saved report ---
+  const sorted = [...dailyReports].filter(r=>r.date).sort((a,b)=>b.date.localeCompare(a.date));
+  const last = sorted[0];
+  if(last) {
+    document.getElementById('ls-date').textContent = last.date;
+    const lsNet = (last.sales?.cash||0)+(last.sales?.credit||0)+(last.sales?.debit||0)+(last.sales?.ebt||0)-(last.sales?.tax||0);
+    document.getElementById('ls-sales').textContent = fmtMoney(lsNet);
+    // Purchases on that date
+    const lastPurch = invoices.filter(i=>i.date===last.date).reduce((s,i)=>s+i.amount,0);
+    document.getElementById('ls-purch').textContent = fmtMoney(lastPurch);
+    // Top 5 categories
+    const lastCats = (last.category_sales||[]).filter(c=>c.netSales>0).sort((a,b)=>b.netSales-a.netSales).slice(0,5);
+    const catContainer = document.getElementById('ls-categories');
+    if(lastCats.length) {
+      const maxCat = lastCats[0].netSales;
+      catContainer.innerHTML = lastCats.map((c,i) => {
+        const pct = Math.round(c.netSales/maxCat*100);
+        return `<div style="background:rgba(255,255,255,0.08);border-radius:7px;padding:8px 10px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+            <span style="font-size:12px;color:rgba(255,255,255,0.85);font-weight:500">${c.name}</span>
+            <span style="font-family:var(--mono);font-size:12px;color:#a8e6c0">${fmtMoney(c.netSales)}</span>
+          </div>
+          <div style="height:3px;background:rgba(255,255,255,0.15);border-radius:2px">
+            <div style="width:${pct}%;height:100%;background:#a8e6c0;border-radius:2px"></div>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      catContainer.innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px">No category data for this report</div>';
+    }
+  } else {
+    document.getElementById('ls-date').textContent = '—';
+    document.getElementById('ls-sales').textContent = '$0.00';
+    document.getElementById('ls-purch').textContent = '$0.00';
+    document.getElementById('ls-categories').innerHTML = '<div style="color:rgba(255,255,255,0.4);font-size:12px">No reports saved yet</div>';
+  }
+
+  // --- SECTION 2: Monthly summary ---
   const monthReports = dailyReports.filter(r => r.date && r.date.startsWith(ym));
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
-  const salesMTD = monthReports.reduce((s,r) => s+(r.sales?.total||0), 0);
-  const avgSale = monthReports.length ? salesMTD/monthReports.length : 0;
-  const estSales = avgSale * daysInMonth;
-  const unpaid = invoices.filter(i => i.status==='unpaid');
-  const unpaidAmt = unpaid.reduce((s,i) => s+i.amount, 0);
+  const daysRecorded = monthReports.length;
+  const salesMTD = monthReports.reduce((s,r) => {
+    return s + (r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0);
+  }, 0);
   const monthInvoices = invoices.filter(i => i.date && i.date.startsWith(ym));
   const purchMTD = monthInvoices.reduce((s,i) => s+i.amount, 0);
-  const daysWithPurch = [...new Set(monthInvoices.map(i => i.date))].length || 1;
-  const estPurch = (purchMTD/Math.max(daysWithPurch,1)) * daysInMonth;
   const machMTD = machineReports.filter(r => r.date && r.date.startsWith(ym)).reduce((s,r) => s+(r.storeIncome||0), 0);
   const margin = salesMTD > 0 ? ((salesMTD - purchMTD)/salesMTD*100).toFixed(1) : null;
+  const avgSale = daysRecorded > 0 ? salesMTD/daysRecorded : 0;
+  const avgPurch = daysRecorded > 0 ? purchMTD/daysRecorded : 0;
+  const unpaid = invoices.filter(i => i.status==='unpaid');
+  const unpaidAmt = unpaid.reduce((s,i) => s+i.amount, 0);
+
   document.getElementById('d-sales-mtd').textContent = fmtMoney(salesMTD);
   document.getElementById('d-purch-mtd').textContent = fmtMoney(purchMTD);
-  document.getElementById('d-sales-est').textContent = fmtMoney(estSales);
-  document.getElementById('d-purch-est').textContent = fmtMoney(estPurch);
   document.getElementById('d-margin').textContent = margin ? margin+'%' : '—';
   document.getElementById('d-avg-sale').textContent = fmtMoney(avgSale);
+  document.getElementById('d-avg-purch').textContent = fmtMoney(avgPurch);
   document.getElementById('d-machine-inc').textContent = fmtMoney(machMTD);
   document.getElementById('d-unpaid-amt').textContent = fmtMoney(unpaidAmt);
-  document.getElementById('d-unpaid-count').textContent = unpaid.length+' invoices';
-  document.getElementById('d-sales-days').textContent = monthReports.length+' days recorded';
-  // Category projections
+  document.getElementById('d-unpaid-count').textContent = unpaid.length+' invoice'+(unpaid.length!==1?'s':'');
+  document.getElementById('d-sales-days').textContent = daysRecorded+' day'+(daysRecorded!==1?'s':'')+' recorded';
+
+  // Top 5 categories this month
   const catMap = {};
-  monthReports.forEach(r => (r.specialty||[]).forEach(s => { if(!catMap[s.name]) catMap[s.name]={total:0,days:0}; catMap[s.name].total+=s.amount; catMap[s.name].days++; }));
-  const catKeys = Object.keys(catMap);
-  const projBody = document.getElementById('cat-proj-body');
-  if(!catKeys.length) { projBody.innerHTML='<div class="empty-state"><div>📊</div>Enter specialty category data in Daily Report to see projections</div>'; }
-  else {
-    projBody.innerHTML = `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:0 0 8px;border-bottom:0.5px solid var(--border);margin-bottom:8px"><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Category</span><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">MTD</span><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">Avg/Day</span><span style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;text-align:right">Est Month</span></div>`+
-    catKeys.map(k => {
-      const d=catMap[k]; const avg=d.total/Math.max(d.days,1); const est=avg*daysInMonth;
-      return `<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:8px;padding:8px 0;border-bottom:0.5px solid var(--border)"><span style="font-size:13px;font-weight:500">${k}</span><span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--green)">${fmtMoney(d.total)}</span><span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--muted)">${fmtMoney(avg)}</span><span style="font-family:var(--mono);font-size:13px;text-align:right;color:var(--amber)">${fmtMoney(est)}</span></div>`;
+  monthReports.forEach(r => {
+    (r.category_sales||[]).forEach(c => {
+      if(!catMap[c.name]) catMap[c.name] = 0;
+      catMap[c.name] += c.netSales||0;
+    });
+  });
+  const topCats = Object.entries(catMap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const topCatEl = document.getElementById('d-top-cats');
+  if(topCats.length) {
+    const maxV = topCats[0][1];
+    topCatEl.innerHTML = topCats.map(([name,val]) => {
+      const pct = Math.round(val/maxV*100);
+      return `<div style="margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+          <span style="font-size:13px;font-weight:500">${name}</span>
+          <span style="font-family:var(--mono);font-size:13px;color:var(--green)">${fmtMoney(val)}</span>
+        </div>
+        <div style="height:4px;background:var(--border);border-radius:2px">
+          <div style="width:${pct}%;height:100%;background:var(--green);border-radius:2px"></div>
+        </div>
+      </div>`;
     }).join('');
+  } else {
+    topCatEl.innerHTML = '<div class="empty-state" style="padding:16px"><div>📊</div>No category data for this month</div>';
   }
+
   // Weekly bars
   const weekDays = [-6,-5,-4,-3,-2,-1,0].map(d => { const dt=new Date(); dt.setDate(dt.getDate()+d); return dt.toISOString().split('T')[0]; });
   const weekData = weekDays.map(d => ({date:d, total:(dailyReports.find(r=>r.date===d)?.sales?.total||0)}));
