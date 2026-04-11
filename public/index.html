@@ -2266,7 +2266,7 @@ function updateDashboard() {
     const lsNet = (last.sales?.cash||0)+(last.sales?.credit||0)+(last.sales?.debit||0)+(last.sales?.ebt||0)-(last.sales?.tax||0) - _bossLast;
     document.getElementById('ls-sales').textContent = fmtMoney(lsNet);
     // Purchases on that date
-    const lastPurch = invoices.filter(i=>i.date===last.date).reduce((s,i)=>s+i.amount,0);
+    const lastPurch = invoices.filter(i=>i.date===last.date && isPurchaseInvoice(i)).reduce((s,i)=>s+i.amount,0);
     document.getElementById('ls-purch').textContent = fmtMoney(lastPurch);
     // Top 5 categories
     const _excludeCats = ['BOSS RECARGAS','Uncategorized','Misc'];
@@ -2306,18 +2306,17 @@ function updateDashboard() {
     return s + gross - bossAmt;
   }, 0);
   const monthInvoices = invoices.filter(i => i.date && i.date.startsWith(ym));
+  const monthPurchInvoices = monthInvoices.filter(i => isPurchaseInvoice(i));
   // Only Purchase type for main purchase metric
-  const getPurchaseType = (inv) => {
-    const v = vendorList.find(vl=>vl.name===inv.vendor);
-    return v?.type || 'Purchase';
-  };
+  // getPurchaseType is defined globally below
   const purchMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Purchase').reduce((s,i)=>s+i.amount,0);
   const repairMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Repair').reduce((s,i)=>s+i.amount,0);
   const officeMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Office Supplies').reduce((s,i)=>s+i.amount,0);
   const machMTD = machineReports.filter(r => r.date && r.date.startsWith(ym)).reduce((s,r) => s+(r.storeIncome||0), 0);
   const margin = salesMTD > 0 ? ((salesMTD - purchMTD)/salesMTD*100).toFixed(1) : null;
   const avgSale = daysRecorded > 0 ? salesMTD/daysRecorded : 0;
-  const avgPurch = daysRecorded > 0 ? purchMTD/daysRecorded : 0;
+  const purchDays = [...new Set(monthPurchInvoices.map(i=>i.date))].length || 1;
+  const avgPurch = purchDays > 0 ? purchMTD/purchDays : 0;
   const unpaid = invoices.filter(i => i.status==='unpaid');
   const unpaidAmt = unpaid.reduce((s,i) => s+i.amount, 0);
 
@@ -2413,7 +2412,7 @@ function updateWeeklyReport() {
     weeks[wk].sales += (r.sales?.total||0);
   });
   invoices.forEach(inv => {
-    if(!inv.date) return;
+    if(!inv.date || !isPurchaseInvoice(inv)) return;
     const d = new Date(inv.date+'T12:00:00');
     const monday = new Date(d); monday.setDate(d.getDate()-((d.getDay()+6)%7));
     const wk = monday.toISOString().split('T')[0];
@@ -2604,7 +2603,7 @@ function loadDailySnapshot() {
     const boss = (report.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;
     const net = (report.sales?.cash||0)+(report.sales?.credit||0)+(report.sales?.debit||0)+(report.sales?.ebt||0)-(report.sales?.tax||0)-boss;
     document.getElementById('ls-sales').textContent = fmtMoney(net);
-    const purch = invoices.filter(i=>i.date===date).reduce((s,i)=>s+i.amount,0);
+    const purch = invoices.filter(i=>i.date===date && isPurchaseInvoice(i)).reduce((s,i)=>s+i.amount,0);
     document.getElementById('ls-purch').textContent = fmtMoney(purch);
     const cats = (report.category_sales||[]).filter(c=>c.netSales>0&&!_exclude.includes(c.name)).sort((a,b)=>b.netSales-a.netSales).slice(0,5);
     if(cats.length) {
@@ -2989,6 +2988,14 @@ function updateBusinessIntelligence() {
 
   html += '</div></div>';
   el.innerHTML = html;
+}
+
+function getPurchaseType(inv) {
+  const v = vendorList.find(vl => vl.name === inv.vendor);
+  return v?.type || 'Purchase';
+}
+function isPurchaseInvoice(inv) {
+  return getPurchaseType(inv) === 'Purchase';
 }
 
 function showToast(msg) {
