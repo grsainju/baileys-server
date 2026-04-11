@@ -426,7 +426,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       </div>
 
       <div class="submit-bar">
-        <button class="submit-btn" onclick="submitDailyReport()">Save Daily Report</button>
+        <button class="submit-btn" onclick="showSaveConfirm()">Save Daily Report</button>
         <span class="save-note">All fields are optional — save what you have</span>
         <span class="save-success" id="daily-saved">✓ Saved successfully</span>
       </div>
@@ -761,6 +761,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- SAVE CONFIRMATION MODAL -->
+<div id="save-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.18);max-height:90vh;overflow-y:auto">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Confirm Daily Report</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px" id="save-confirm-date"></div>
+    <div id="save-confirm-body" style="font-size:13px"></div>
+    <div style="display:flex;gap:8px;margin-top:20px">
+      <button onclick="proceedSaveReport()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Submit</button>
+      <button onclick="document.getElementById('save-confirm-modal').style.display='none'" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Edit</button>
+    </div>
+  </div>
+</div>
 
 <!-- OVERWRITE MODAL -->
 <div id="overwrite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
@@ -1957,6 +1970,90 @@ async function saveEditedReport() {
     setTimeout(()=>document.getElementById('edit-saved').style.display='none', 3000);
     showToast('Report updated successfully');
   } catch(e) { showToast('Save failed: ' + e.message); }
+}
+
+function showSaveConfirm() {
+  const date = document.getElementById('report-date').value;
+  if(!date) { showToast('Select a date first'); return; }
+  const fmt = v => '$' + Math.abs(parseFloat(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const cashRows = [...document.querySelectorAll('.payout-amt')];
+  const cashPayout = cashRows.reduce((s,el) => s+(parseFloat(el.value)||0), 0);
+  const f = id => parseFloat(document.getElementById(id)?.value)||0;
+
+  // Build rows - only show if has value
+  const rows = [
+    {label:'Cash Sales', val:f('s-cash'), section:'sales'},
+    {label:'Credit Card', val:f('s-credit'), section:'sales'},
+    {label:'Debit Card', val:f('s-debit'), section:'sales'},
+    {label:'EBT / Food Stamp', val:f('s-ebt'), section:'sales'},
+    {label:'Tax Collected', val:f('s-tax'), section:'sales'},
+    {divider:true, label:'Payouts'},
+    {label:'Cash Payouts Total', val:cashPayout, section:'payouts'},
+    {label:'Lottery Payout', val:f('p-lottery'), section:'payouts', allowNeg:true},
+    {label:'Game Machine Winner', val:f('p-game'), section:'payouts'},
+    {label:'Lottery Refund', val:f('p-lotref'), section:'payouts'},
+    {label:'ATM Balance Add', val:f('p-atm'), section:'payouts'},
+    {label:'Missing / Extra', val:f('p-misc'), section:'payouts', allowNeg:true},
+    {divider:true, label:'Cash Deposit'},
+    {label:'POS Cash', val:f('d-pos'), section:'deposit'},
+    {label:'Lottery Kiosk Cash', val:f('d-lottery'), section:'deposit'},
+    {label:'Toy Machine Commission', val:f('d-toy'), section:'deposit'},
+    {label:'Coin Game Commission', val:f('d-coin'), section:'deposit'},
+    {label:'Other Cash', val:f('d-other'), section:'deposit'},
+  ];
+
+  // Calculate totals
+  const netSales = f('s-cash')+f('s-credit')+f('s-debit')+f('s-ebt')-f('s-tax');
+  const depositTotal = f('d-pos')+f('d-lottery')+f('d-toy')+f('d-coin')+f('d-other');
+  const expectedCash = f('s-cash') - cashPayout + f('p-lottery') - f('p-atm') + f('p-misc');
+  const variance = f('d-pos') - expectedCash;
+
+  let html = '';
+  let lastHadDivider = false;
+  rows.forEach(row => {
+    if(row.divider) {
+      lastHadDivider = true;
+      return;
+    }
+    const show = row.allowNeg ? row.val !== 0 : row.val > 0;
+    if(!show) return;
+    if(lastHadDivider) {
+      html += '<div style="height:0.5px;background:#e2e0d8;margin:10px 0"></div>';
+      lastHadDivider = false;
+    }
+    html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
+      <span style="color:#6b6860">${row.label}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:500">${fmt(row.val)}</span>
+    </div>`;
+  });
+
+  // Add totals section
+  html += '<div style="height:0.5px;background:#e2e0d8;margin:10px 0"></div>';
+  html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
+    <span style="color:#6b6860">Net Sales</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:#1a5c3a">${fmt(netSales)}</span>
+  </div>`;
+  html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
+    <span style="font-weight:600">Total Bank Deposit Today</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#1a5c3a">${fmt(depositTotal)}</span>
+  </div>`;
+  if(Math.abs(variance) >= 0.01 && f('s-cash') > 0) {
+    const isShort = variance < 0;
+    html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
+      <span style="${isShort?'color:#b83232;font-weight:600':'color:#6b6860'}">${isShort?'Cash Short':'Cash Over'}</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:${isShort?'#b83232':'#1a5c3a'}">${isShort?'-':''}${fmt(Math.abs(variance))}</span>
+    </div>`;
+  }
+
+  document.getElementById('save-confirm-date').textContent = 'Report for ' + date;
+  document.getElementById('save-confirm-body').innerHTML = html;
+  document.getElementById('save-confirm-modal').style.display = 'flex';
+}
+
+function proceedSaveReport() {
+  document.getElementById('save-confirm-modal').style.display = 'none';
+  window._skipOverwriteCheck = false;
+  submitDailyReport();
 }
 
 function showToast(msg) {
