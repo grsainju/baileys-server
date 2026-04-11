@@ -1000,12 +1000,13 @@ function calcCashVariance() {
     return;
   }
   // Expected cash in register:
-  // Cash Sales + Lottery Payout - ATM Balance Add + Missing/Extra
-  // (Cash Payouts & Game Winner & Lottery Refund are paid out via POS, already reflected in Cash Sales)
+  // Cash Sales - Cash Payouts + Lottery Payout - ATM Balance Add + Missing/Extra
+  const cashRows = [...document.querySelectorAll('.payout-amt')];
+  const cashPayout = cashRows.reduce((s,el) => s + (parseFloat(el.value)||0), 0);
   const lottery = getVal('p-lottery');  // positive adds cash, negative reduces
   const atm = getVal('p-atm');          // ATM top-up reduces cash in register
   const misc = getVal('p-misc');        // positive adds, negative reduces
-  const expectedCash = cashSales + lottery - atm + misc;
+  const expectedCash = cashSales - cashPayout + lottery - atm + misc;
   // Variance = what you deposited minus what was expected
   const variance = posCashDeposit - expectedCash;
   const bar = document.getElementById('cash-variance-bar');
