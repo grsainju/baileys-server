@@ -944,7 +944,10 @@ async function parseCloverCSV() {
   if(!date) { showToast('Select a date first'); return; }
 
   // Show inline warning if today and before 11pm
-  checkStoreOpenWarning();
+  const _nowEST = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+  const _todayEST = _nowEST.toISOString().split('T')[0];
+  const _note = document.getElementById('store-open-note');
+  if(_note) _note.style.display = (date === _todayEST && _nowEST.getHours() < 23) ? 'inline' : 'none';
   btn.innerHTML = '<span>⟳</span> Pulling...';
   btn.style.opacity = '0.7';
   status.style.display = 'none';
@@ -1196,6 +1199,7 @@ function calcDeposit() {
 // ---- SPECIALTY ----
 function buildSpecialtyRows() {
   const container = document.getElementById('specialty-rows');
+  if(!container) return;
   container.innerHTML = specialtyCategories.map((cat,i) => `
     <div class="form-grid fg-2" style="margin-bottom:8px" id="scat-${i}">
       <div class="fgroup">
