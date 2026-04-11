@@ -323,7 +323,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Cash Payouts</div>
           <div id="cash-payout-rows">
             <div class="cash-payout-row" style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px;align-items:end">
-              <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" class="payout-amt" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+              <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" class="payout-amt" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
               <div class="fgroup"><label>Paid To / Notes</label><input type="text" class="payout-note" placeholder="e.g. Mi Mexico vendor payment"></div>
               <button onclick="removeCashPayout(this)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
             </div>
@@ -334,9 +334,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 8px">Other Payouts</div>
           <div class="form-grid fg-3">
             <div class="fgroup"><label>Lottery Payout</label><div class="dollar"><input type="number" id="p-lottery" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
-            <div class="fgroup"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="p-game" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
-            <div class="fgroup"><label>Lottery Refund</label><div class="dollar"><input type="number" id="p-lotref" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
-            <div class="fgroup"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="p-atm" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="p-game" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>Lottery Refund</label><div class="dollar"><input type="number" id="p-lotref" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
+            <div class="fgroup"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="p-atm" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
             <div class="fgroup"><label>Missing / Extra</label><div class="dollar"><input type="number" id="p-misc" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
           </div>
           <div class="divider"></div>
@@ -993,34 +993,36 @@ function calcPayouts() {
 }
 function calcCashVariance() {
   const posCash = getVal('s-cash');
+  if(posCash === 0) {
+    const bar = document.getElementById('cash-variance-bar');
+    if(bar) bar.style.display = 'none';
+    return;
+  }
+  // Formula: Cash Sales - Cash Payouts + Lottery Payout - Game Winner - Lottery Refund - ATM - Missing/Extra
   const cashRows = [...document.querySelectorAll('.payout-amt')];
   const cashPayout = cashRows.reduce((s,el) => s + (parseFloat(el.value)||0), 0);
-  const otherPayouts = getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
-  const variance = posCash - cashPayout - otherPayouts;
+  const lottery = getVal('p-lottery');    // can be negative
+  const game = getVal('p-game');          // positive only
+  const lotref = getVal('p-lotref');      // positive only
+  const atm = getVal('p-atm');            // positive only
+  const misc = getVal('p-misc');          // can be negative
+  const variance = posCash - cashPayout + lottery - game - lotref - atm + misc;
   const bar = document.getElementById('cash-variance-bar');
   const label = document.getElementById('cash-variance-label');
   const val = document.getElementById('cash-variance-val');
   if(!bar) return;
-  if(Math.abs(variance) < 0.01 || posCash === 0) {
+  if(Math.abs(variance) < 0.01) {
     bar.style.display = 'none';
     return;
   }
   bar.style.display = 'flex';
-  if(variance > 0) {
-    bar.style.background = 'var(--green-l)';
-    bar.style.borderColor = 'var(--green-m)';
-    label.style.color = 'var(--green)';
-    val.style.color = 'var(--green)';
-    label.textContent = '✓ Cash Over';
-    val.textContent = '+' + fmtMoney(variance);
-  } else {
-    bar.style.background = 'var(--red-l)';
-    bar.style.borderColor = '#f09595';
-    label.style.color = 'var(--red)';
-    val.style.color = 'var(--red)';
-    label.textContent = '⚠ Cash Short';
-    val.textContent = '-' + fmtMoney(Math.abs(variance));
-  }
+  bar.style.background = 'none';
+  bar.style.borderColor = 'transparent';
+  bar.style.border = 'none';
+  label.style.color = variance < 0 ? 'var(--red)' : 'var(--muted)';
+  val.style.color = variance < 0 ? 'var(--red)' : 'var(--text)';
+  label.textContent = variance >= 0 ? 'Cash Over' : 'Cash Short';
+  val.textContent = variance >= 0 ? fmtMoney(variance) : '-' + fmtMoney(Math.abs(variance));
 }
 function addCashPayoutRow() {
   const row = document.createElement('div');
