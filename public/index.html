@@ -2785,9 +2785,13 @@ function deleteVendor(id) {
 
 function saveVendorList() {
   try { localStorage.setItem('vendorList', JSON.stringify(vendorList)); } catch(e){}
+  // Save non-Purchase types to server so they persist across devices
+  const overrides = {};
+  vendorList.forEach(v => { if(v.type && v.type !== 'Purchase') overrides[v.name] = v.type; });
+  apiPost('/api/settings', {key:'vendorTypes', value:JSON.stringify(overrides)}).catch(()=>{});
 }
 
-function loadVendorData() {
+async function loadVendorData() {
   try {
     const saved = localStorage.getItem('vendorList');
     if(saved) vendorList = JSON.parse(saved);
@@ -2797,6 +2801,19 @@ function loadVendorData() {
       if(!vendorList.find(v=>v.name===name)) vendorList.push({id:name, name, type:'Purchase', notes:''});
     });
   } catch(e) {}
+  // Load vendor type overrides from server
+  try {
+    const res = await apiGet('/api/settings?key=vendorTypes');
+    if(res && res.value) {
+      _vendorTypeMap = JSON.parse(res.value);
+      // Also update local vendorList with server types
+      Object.entries(_vendorTypeMap).forEach(([name, type]) => {
+        const v = vendorList.find(vl=>vl.name===name);
+        if(v) v.type = type;
+        else vendorList.push({id:name, name, type, notes:''});
+      });
+    }
+  } catch(e) { /* server not available, use local */ }
 }
 
 const VM_TYPES = ['Purchase','Repair','Office Supplies','Utilities','Services','Other'];
@@ -2990,7 +3007,13 @@ function updateBusinessIntelligence() {
   el.innerHTML = html;
 }
 
+// Server-loaded vendor type overrides (loaded at init)
+let _vendorTypeMap = {};
+
 function getPurchaseType(inv) {
+  // Check server-loaded map first
+  if(_vendorTypeMap[inv.vendor]) return _vendorTypeMap[inv.vendor];
+  // Then check local vendorList
   const v = vendorList.find(vl => vl.name === inv.vendor);
   return v?.type || 'Purchase';
 }
