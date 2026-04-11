@@ -858,6 +858,19 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 </div>
 <div class="toast" id="toast"></div>
 
+<!-- INVOICE CONFIRM MODAL -->
+<div id="inv-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:600;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:400px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Confirm Invoice</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Please review before saving</div>
+    <div id="inv-confirm-body" style="font-size:13px;margin-bottom:20px"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="submitConfirmedInvoice()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Save Invoice</button>
+      <button onclick="document.getElementById('inv-confirm-modal').style.display='none'" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Edit</button>
+    </div>
+  </div>
+</div>
+
 <!-- ADD / EDIT INVOICE MODAL -->
 <div id="inv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
   <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
@@ -1743,6 +1756,22 @@ function openEditInvoiceModal(id) {
 function closeInvoiceModal() {
   document.getElementById('inv-modal').style.display = 'none';
 }
+async function submitConfirmedInvoice() {
+  document.getElementById('inv-confirm-modal').style.display = 'none';
+  const inv = window._pendingInvoice;
+  if(!inv) return;
+  const dbInv = {store:'baileys', invoice_date:inv.date, invoice_num:inv.num, vendor:inv.vendor,
+    amount:inv.amount, status:inv.status, pay_type:inv.paytype||null,
+    check_number:inv.checkNumber||null, notes:inv.notes||null};
+  try {
+    const saved = await apiPost('/api/invoices', dbInv);
+    const savedInv = Array.isArray(saved)?saved[0]:saved;
+    invoices.unshift({id:savedInv?.id||Date.now().toString(),...inv});
+    closeInvoiceModal();
+    renderInvoices();
+    showToast('Invoice saved');
+  } catch(e) { showToast('Save failed: '+e.message); }
+}
 
 function populateVendorSelect() {
   loadVendorData();
@@ -1825,16 +1854,25 @@ async function saveInvoiceModal() {
         }
       }
     }
-    const dbInv = {store:'baileys', invoice_date:inv.date, invoice_num:inv.num, vendor:inv.vendor,
-      amount:inv.amount, status:inv.status, pay_type:inv.paytype||null, notes:inv.notes||null};
-    try {
-      const saved = await apiPost('/api/invoices', dbInv);
-      const savedInv = Array.isArray(saved)?saved[0]:saved;
-      invoices.unshift({id:savedInv?.id||Date.now().toString(),...inv});
-      closeInvoiceModal();
-      renderInvoices();
-      showToast('Invoice saved');
-    } catch(e) { showToast('Save failed: '+e.message); }
+    // Show confirmation popup before saving
+    window._pendingInvoice = inv;
+    const rows = [
+      ['Receipt Date', inv.date],
+      ['Invoice Number', inv.num || '—'],
+      ['Vendor', inv.vendor],
+      ['Amount', fmtMoney(inv.amount)],
+      ['Status', inv.status.charAt(0).toUpperCase()+inv.status.slice(1)],
+      ['Pay Type', inv.paytype || '—'],
+      inv.paytype==='check' ? ['Check Number', inv.checkNumber||'—'] : null,
+      ['Notes', inv.notes || '—'],
+    ].filter(Boolean);
+    document.getElementById('inv-confirm-body').innerHTML = rows.map(([label,val]) =>
+      `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:0.5px solid #f0eeea">
+        <span style="color:#6b6860">${label}</span>
+        <span style="font-weight:500;max-width:200px;text-align:right">${val}</span>
+      </div>`
+    ).join('');
+    document.getElementById('inv-confirm-modal').style.display = 'flex';
   }
 }
 
@@ -2544,8 +2582,8 @@ function loadDailySnapshot() {
   }
 }
 
-function buildCatPickers() {
-  // Get all unique category names from all reports (excluding BOSS/Misc/Uncategorized)
+async function buildCatPickers() {
+  // Get all unique category names from all reports
   const exclude = ['BOSS RECARGAS','Uncategorized','Misc'];
   const allCats = new Set();
   dailyReports.forEach(r => (r.category_sales||[]).filter(c=>!exclude.includes(c.name)&&c.netSales>0).forEach(c=>allCats.add(c.name)));
@@ -2554,21 +2592,30 @@ function buildCatPickers() {
   ['cat-pick-1','cat-pick-2','cat-pick-3'].forEach(id => {
     const sel = document.getElementById(id);
     if(!sel) return;
-    const cur = sel.value;
     sel.innerHTML = opts;
-    sel.value = cur; // restore selection
   });
-  // Restore saved picks from localStorage
+  // Load picks from server first, fallback to localStorage
+  let picks = [];
   try {
-    const saved = JSON.parse(localStorage.getItem('catPicks')||'[]');
-    saved.forEach((v,i) => { const el = document.getElementById(`cat-pick-${i+1}`); if(el) el.value=v||''; });
-  } catch(e){}
+    const serverPicks = await apiGet('/api/settings?key=catPicks');
+    if(serverPicks && serverPicks.value) {
+      picks = JSON.parse(serverPicks.value);
+    } else {
+      const local = localStorage.getItem('catPicks');
+      if(local) picks = JSON.parse(local);
+    }
+  } catch(e) {
+    try { const local = localStorage.getItem('catPicks'); if(local) picks = JSON.parse(local); } catch(e2){}
+  }
+  picks.forEach((v,i) => { const el = document.getElementById(`cat-pick-${i+1}`); if(el) el.value=v||''; });
   renderCatProjections();
 }
 
 function saveCatPicks() {
   const picks = [1,2,3].map(i => document.getElementById(`cat-pick-${i}`)?.value||'');
   try { localStorage.setItem('catPicks', JSON.stringify(picks)); } catch(e){}
+  // Save to server so it persists across devices
+  apiPost('/api/settings', {key:'catPicks', value:JSON.stringify(picks)}).catch(()=>{});
   renderCatProjections();
 }
 
@@ -2583,7 +2630,13 @@ function renderCatProjections() {
   const monthName = new Date(yr,mo-1,1).toLocaleString('default',{month:'long',year:'numeric'});
   const [yr2, mo2] = ym.split('-').map(Number);
   const daysInMo = new Date(yr2, mo2, 0).getDate();
-  el.innerHTML = picks.map(cat => {
+  const catColors = [
+    {bg:'#e8f4ed',border:'#b8dfc8',label:'#1a5c3a'},
+    {bg:'#eaf0fb',border:'#b8cef5',label:'#1a4a8a'},
+    {bg:'#fef3e2',border:'#f5c26b',label:'#b8600a'},
+  ];
+  el.innerHTML = picks.map((cat,ci) => {
+    const col = catColors[ci % catColors.length];
     const total = monthReports.reduce((s,r) => {
       const c = (r.category_sales||[]).find(c=>c.name===cat);
       return s + (c?.netSales||0);
@@ -2591,23 +2644,30 @@ function renderCatProjections() {
     const days = monthReports.filter(r=>(r.category_sales||[]).some(c=>c.name===cat&&c.netSales>0)).length;
     const avg = days > 0 ? total/days : 0;
     const est = avg * daysInMo;
-    return `<div style="padding:12px;background:var(--surface2);border-radius:8px;margin-bottom:8px;border:0.5px solid var(--border)">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">${cat}</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
-        <div style="text-align:center;padding:8px;background:var(--surface);border-radius:6px;border:0.5px solid var(--border)">
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:3px">Actual MTD</div>
-          <div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--green)">${fmtMoney(total)}</div>
+    const pct = est > 0 ? Math.min(100, Math.round(total/est*100)) : 0;
+    return `<div style="padding:14px;background:${col.bg};border-radius:10px;margin-bottom:10px;border:0.5px solid ${col.border}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="font-size:14px;font-weight:600;color:${col.label}">${cat}</div>
+        <div style="font-size:11px;color:${col.label};opacity:0.7">${days} days · ${monthName}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.6);border-radius:7px">
+          <div style="font-size:10px;color:${col.label};text-transform:uppercase;font-weight:600;margin-bottom:3px;opacity:0.8">Actual MTD</div>
+          <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${col.label}">${fmtMoney(total)}</div>
         </div>
-        <div style="text-align:center;padding:8px;background:var(--surface);border-radius:6px;border:0.5px solid var(--border)">
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600;margin-bottom:3px">Avg / Day</div>
-          <div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--text)">${fmtMoney(avg)}</div>
+        <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.6);border-radius:7px">
+          <div style="font-size:10px;color:${col.label};text-transform:uppercase;font-weight:600;margin-bottom:3px;opacity:0.8">Avg / Day</div>
+          <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${col.label}">${fmtMoney(avg)}</div>
         </div>
-        <div style="text-align:center;padding:8px;background:var(--amber-l);border-radius:6px;border:0.5px solid #f5c26b">
-          <div style="font-size:10px;color:var(--amber);text-transform:uppercase;font-weight:600;margin-bottom:3px">Est. Month</div>
-          <div style="font-family:var(--mono);font-size:14px;font-weight:600;color:var(--amber)">${fmtMoney(est)}</div>
+        <div style="text-align:center;padding:8px 4px;background:rgba(255,255,255,0.8);border-radius:7px;border:0.5px solid ${col.border}">
+          <div style="font-size:10px;color:${col.label};text-transform:uppercase;font-weight:600;margin-bottom:3px;opacity:0.8">Est. Month</div>
+          <div style="font-family:var(--mono);font-size:15px;font-weight:700;color:${col.label}">${fmtMoney(est)}</div>
         </div>
       </div>
-      <div style="font-size:11px;color:var(--hint);margin-top:6px">${days} days recorded · ${daysInMo} days in month</div>
+      <div style="height:6px;background:rgba(255,255,255,0.5);border-radius:3px;overflow:hidden">
+        <div style="width:${pct}%;height:100%;background:${col.label};border-radius:3px;opacity:0.6;transition:width 0.5s"></div>
+      </div>
+      <div style="font-size:10px;color:${col.label};opacity:0.7;margin-top:4px;text-align:right">${pct}% of estimated</div>
     </div>`;
   }).join('');
 }
