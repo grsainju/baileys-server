@@ -252,12 +252,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         <div class="page-sub">Enter today's sales, payouts, and cash activity</div>
       </div>
 
-      <div id="store-open-warning" style="display:none;background:#fef3e2;border:0.5px solid #f5c26b;border-radius:var(--r);padding:10px 15px;margin-bottom:10px;font-size:13px;color:#b8600a;font-weight:500">
-        ⚠ Store is still open — data pulled is only until <span id="warning-time"></span> EST. Save only after store closes.
-      </div>
       <div class="date-bar">
         <label>Report Date</label>
-        <input type="date" id="report-date" onchange="checkExistingReport(); checkStoreOpenWarning();">
+        <input type="date" id="report-date" onchange="checkExistingReport()">
         <span id="report-exists-badge" style="display:none;font-size:12px;padding:4px 10px;background:var(--green-l);color:var(--green);border-radius:20px;font-weight:500"></span>
         <div class="clover-btn" onclick="parseCloverCSV()" id="clover-pull-btn">
           <span>↓</span> Pull from Clover
@@ -824,7 +821,6 @@ async function init() {
   renderInvoices();
   updateDashboard();
   loadVendorList();
-  checkStoreOpenWarning();
 }
 
 // ---- CLOVER DIRECT PULL ----
@@ -834,8 +830,16 @@ async function parseCloverCSV() {
   const date = document.getElementById('report-date').value;
   if(!date) { showToast('Select a date first'); return; }
 
-  // Show warning bar if pulling today's data before 11pm EST
-  checkStoreOpenWarning();
+  // Warn if pulling today's data before 11pm EST
+  const nowEST = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+  const todayEST = nowEST.toISOString().split('T')[0];
+  if(date === todayEST && nowEST.getHours() < 23) {
+    const hour = nowEST.getHours();
+    const min = nowEST.getMinutes();
+    const timeStr = `${hour % 12 || 12}:${min.toString().padStart(2,'0')} ${hour >= 12 ? 'PM' : 'AM'} EST`;
+    const proceed = confirm(`⚠️ Store may still be open\n\nCurrent time is ${timeStr}. Pulling data for today before the store closes may give incomplete sales numbers.\n\nIf you save this report now, you may miss sales that happen later today.\n\nContinue anyway?`);
+    if(!proceed) return;
+  }
   btn.innerHTML = '<span>⟳</span> Pulling...';
   btn.style.opacity = '0.7';
   status.style.display = 'none';
@@ -1272,22 +1276,6 @@ async function saveMachines() {
 
 // ---- DAILY REPORT SAVE ----
 
-function checkStoreOpenWarning() {
-  const date = document.getElementById('report-date').value;
-  const nowEST = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
-  const todayEST = nowEST.toISOString().split('T')[0];
-  const warningBar = document.getElementById('store-open-warning');
-  if(!warningBar) return;
-  if(date === todayEST && nowEST.getHours() < 23) {
-    const hour = nowEST.getHours();
-    const min = nowEST.getMinutes();
-    const timeStr = `${hour % 12 || 12}:${min.toString().padStart(2,'0')} ${hour >= 12 ? 'PM' : 'AM'}`;
-    document.getElementById('warning-time').textContent = timeStr;
-    warningBar.style.display = 'block';
-  } else {
-    warningBar.style.display = 'none';
-  }
-
 async function checkExistingReport() {
   const date = document.getElementById('report-date').value;
   if(!date) return;
@@ -1333,20 +1321,41 @@ async function submitDailyReport() {
   } catch(e) {
     // If check fails, proceed with save
   }
-  const specialty = specialtyCategories.map((name,i) => ({name, amount: getVal('sc-'+i)}));
-  const rec = {
-    date,
-    sales: {cash:getVal('s-cash'), credit:getVal('s-credit'), debit:getVal('s-debit'), ebt:getVal('s-ebt'), tax:getVal('s-tax'), kitchen:getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt'), total: getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt')},
-    payouts: {cash:getVal('p-cash'), lottery:getVal('p-lottery'), game:getVal('p-game'), lotteryRefund:getVal('p-lotref'), atm:getVal('p-atm'), misc:getVal('p-misc'), total: getVal('p-cash')+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc')},
-    transfer: {mgTxn:getVal('mg-txn'), mgDep:getVal('mg-dep'), brTxn:getVal('br-txn'), brDep:getVal('br-dep')},
-    deposit: {pos:getVal('d-pos'), lottery:getVal('d-lottery'), toy:getVal('d-toy'), coin:getVal('d-coin'), other:getVal('d-other'), total: getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other')},
-    specialty, notes: document.getElementById('daily-notes').value, ts: Date.now()
+  const specialty = specialtyCategories.map((cat,i) => ({name: typeof cat==='object'?cat.name:cat, amount: getVal('sc-'+i)}));
+  const cashRows = [...document.querySelectorAll('.payout-amt')];
+  const cashPayout = cashRows.reduce((s,el) => s+(parseFloat(el.value)||0), 0);
+  const salesTotal = getVal('s-cash')+getVal('s-credit')+getVal('s-debit')+getVal('s-ebt');
+  const payoutTotal = cashPayout+getVal('p-lottery')+getVal('p-game')+getVal('p-lotref')+getVal('p-atm')+getVal('p-misc');
+  const depositTotal = getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other');
+  const dbRec = {
+    store:'baileys', report_date:date,
+    sales_cash:getVal('s-cash'), sales_credit:getVal('s-credit'), sales_debit:getVal('s-debit'),
+    sales_ebt:getVal('s-ebt'), sales_tax:getVal('s-tax'),
+    sales_kitchen:getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt'),
+    sales_total:salesTotal,
+    payout_cash:cashPayout, payout_lottery:getVal('p-lottery'), payout_game:getVal('p-game'),
+    payout_lottery_refund:getVal('p-lotref'), payout_atm:getVal('p-atm'), payout_misc:getVal('p-misc'),
+    payout_total:payoutTotal,
+    moneygram_txn:getVal('mg-txn'), moneygram_dep:getVal('mg-dep'), boss_txn:0, boss_dep:0,
+    deposit_pos:getVal('d-pos'), deposit_lottery:getVal('d-lottery'), deposit_toy:getVal('d-toy'),
+    deposit_coin:getVal('d-coin'), deposit_other:getVal('d-other'), deposit_total:depositTotal,
+    specialty:specialty, category_sales:window._pulledCategories||[],
+    notes:document.getElementById('daily-notes').value,
+    updated_at:new Date().toISOString()
   };
-  const idx = dailyReports.findIndex(r => r.date === date);
-  if(idx>=0) dailyReports[idx]=rec; else dailyReports.push(rec);
-  document.getElementById('daily-saved').style.display = 'inline';
-  setTimeout(() => document.getElementById('daily-saved').style.display='none', 3000);
-  showToast('Daily report saved');
+  try {
+    await apiPost('/api/daily', dbRec);
+    const rec = {date, sales:{cash:getVal('s-cash'),credit:getVal('s-credit'),debit:getVal('s-debit'),ebt:getVal('s-ebt'),tax:getVal('s-tax'),kitchen:getVal('k-cash')+getVal('k-credit')+getVal('k-debit')+getVal('k-ebt'),total:salesTotal},
+      payouts:{cash:cashPayout,lottery:getVal('p-lottery'),game:getVal('p-game'),lotteryRefund:getVal('p-lotref'),atm:getVal('p-atm'),misc:getVal('p-misc'),total:payoutTotal},
+      transfer:{mgTxn:getVal('mg-txn'),mgDep:getVal('mg-dep'),brTxn:0,brDep:0},
+      deposit:{pos:getVal('d-pos'),lottery:getVal('d-lottery'),toy:getVal('d-toy'),coin:getVal('d-coin'),other:getVal('d-other'),total:depositTotal},
+      specialty, notes:document.getElementById('daily-notes').value};
+    const idx = dailyReports.findIndex(r => r.date === date);
+    if(idx>=0) dailyReports[idx]=rec; else dailyReports.push(rec);
+    document.getElementById('daily-saved').style.display = 'inline';
+    setTimeout(() => document.getElementById('daily-saved').style.display='none', 3000);
+    showToast('Daily report saved to database');
+  } catch(e) { showToast('Save failed: ' + e.message); }
 }
 
 // ---- INVOICES ----
