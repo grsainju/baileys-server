@@ -1850,8 +1850,11 @@ async function saveInvoiceModal() {
       if(local) Object.assign(local, {date:inv.date,num:inv.num,vendor:inv.vendor,amount:inv.amount,status:inv.status,paytype:inv.paytype,checkNumber:inv.checkNumber,notes:inv.notes});
       closeInvoiceModal();
       renderInvoices();
-      showToast('Invoice updated');
-    } catch(e) { showToast('Save failed: '+e.message); }
+      showToast('✓ Invoice updated — saved to database');
+    } catch(e) {
+      showToast('⚠ Save failed — NOT saved: '+e.message);
+      console.error('Invoice edit error:', e);
+    }
   } else {
     // Add new - duplicate check
     // Duplicate check: same invoice number + vendor + amount
@@ -2055,8 +2058,11 @@ async function confirmMarkPaid() {
     document.getElementById('check-number').value = '';
     renderInvoices();
     const count = ids.length;
-    showToast(count > 1 ? count + ' invoices marked as paid' : 'Invoice marked as paid');
-  } catch(e) { showToast('Save failed: ' + e.message); }
+    showToast(count > 1 ? count + ' invoices marked as paid ✓' : '✓ Invoice marked as paid — saved to database');
+  } catch(e) {
+    showToast('⚠ Save failed — invoice NOT saved: ' + e.message);
+    console.error('confirmMarkPaid error:', e);
+  }
 }
 function closePayModal() {
   document.getElementById('pay-modal').style.display = 'none';
