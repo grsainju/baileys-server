@@ -320,26 +320,43 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <div class="card-chevron">▼</div>
         </div>
         <div class="card-body">
-          <!-- Cash Payouts - dynamic rows -->
-          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Cash Payouts</div>
-          <div id="cash-payout-rows">
-            <div class="cash-payout-row" style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px;align-items:end">
-              <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" class="payout-amt" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
-              <div class="fgroup"><label>Paid To / Notes</label><input type="text" class="payout-note" placeholder="e.g. Mi Mexico vendor payment"></div>
-              <button onclick="removeCashPayout(this)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
-            </div>
-          </div>
-          <button onclick="addCashPayoutRow()" class="add-row-btn" style="margin-bottom:14px">+ Add Cash Payout</button>
-          <div class="divider"></div>
-          <!-- Other payouts -->
-          <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin:0 0 8px">Other Payouts</div>
-          <div class="form-grid fg-3">
+          <!-- Always visible: Lottery Payout + Missing/Extra -->
+          <div class="form-grid fg-2" style="margin-bottom:12px">
             <div class="fgroup"><label>Lottery Payout</label><div class="dollar"><input type="number" id="p-lottery" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
-            <div class="fgroup"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="p-game" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
-            <div class="fgroup"><label>Lottery Refund</label><div class="dollar"><input type="number" id="p-lotref" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
-            <div class="fgroup"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="p-atm" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
             <div class="fgroup"><label>Missing / Extra</label><div class="dollar"><input type="number" id="p-misc" step="0.01" placeholder="0.00" oninput="calcPayouts()"></div></div>
           </div>
+
+          <!-- Hidden fields - shown when added -->
+          <div id="p-game-row" style="display:none;margin-bottom:10px">
+            <div style="display:flex;align-items:flex-end;gap:8px">
+              <div class="fgroup" style="flex:1"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="p-game" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
+              <button onclick="removeOptionalPayout('p-game-row','p-game')" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
+            </div>
+          </div>
+          <div id="p-lotref-row" style="display:none;margin-bottom:10px">
+            <div style="display:flex;align-items:flex-end;gap:8px">
+              <div class="fgroup" style="flex:1"><label>Lottery Refund</label><div class="dollar"><input type="number" id="p-lotref" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
+              <button onclick="removeOptionalPayout('p-lotref-row','p-lotref')" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
+            </div>
+          </div>
+          <div id="p-atm-row" style="display:none;margin-bottom:10px">
+            <div style="display:flex;align-items:flex-end;gap:8px">
+              <div class="fgroup" style="flex:1"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="p-atm" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
+              <button onclick="removeOptionalPayout('p-atm-row','p-atm')" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
+            </div>
+          </div>
+
+          <!-- Cash Payout rows (multiple) -->
+          <div id="cash-payout-rows" style="margin-bottom:4px"></div>
+
+          <!-- Add buttons -->
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+            <button onclick="addCashPayoutRow()" class="add-row-btn" style="flex:1;min-width:140px">+ Cash Payout</button>
+            <button onclick="showOptionalPayout('p-game-row')" id="btn-p-game" class="add-row-btn" style="flex:1;min-width:140px">+ Game Machine Winner</button>
+            <button onclick="showOptionalPayout('p-lotref-row')" id="btn-p-lotref" class="add-row-btn" style="flex:1;min-width:140px">+ Lottery Refund</button>
+            <button onclick="showOptionalPayout('p-atm-row')" id="btn-p-atm" class="add-row-btn" style="flex:1;min-width:140px">+ ATM Balance Add</button>
+          </div>
+
           <div class="divider"></div>
           <div style="display:flex;justify-content:space-between;align-items:center">
             <span style="font-size:13px;color:var(--muted);font-weight:500">Total Payouts</span>
@@ -970,13 +987,19 @@ async function parseCloverCSV() {
    'mg-txn','mg-dep','d-pos','d-lottery','d-toy','d-coin','d-other'].forEach(id => {
     const el = document.getElementById(id); if(el) el.value = '';
   });
-  // Clear cash payout rows - keep one empty row
-  document.getElementById('cash-payout-rows').innerHTML = `
-    <div class="cash-payout-row" style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px;align-items:end">
-      <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" class="payout-amt" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
-      <div class="fgroup"><label>Paid To / Notes</label><input type="text" class="payout-note" placeholder="e.g. Mi Mexico vendor payment"></div>
-      <button onclick="removeCashPayout(this)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
-    </div>`;
+  // Clear cash payout rows
+  document.getElementById('cash-payout-rows').innerHTML = '';
+  // Hide optional payout rows and reset their values
+  ['p-game-row','p-lotref-row','p-atm-row'].forEach(rowId => {
+    const row = document.getElementById(rowId);
+    if(row) row.style.display = 'none';
+  });
+  ['p-game','p-lotref','p-atm'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  ['btn-p-game','btn-p-lotref','btn-p-atm'].forEach(id => {
+    const btn = document.getElementById(id); if(btn) btn.style.display = 'block';
+  });
   document.getElementById('daily-notes').value = '';
   calcSales(); calcKitchen(); calcPayouts(); calcTransfer(); calcDeposit();
   window._pulledCategories = null;
@@ -1175,6 +1198,23 @@ function calcCashVariance() {
   val.style.color = variance < 0 ? 'var(--red)' : 'var(--text)';
   label.textContent = variance >= 0 ? 'Cash Over' : 'Cash Short';
   val.textContent = variance >= 0 ? fmtMoney(variance) : '-' + fmtMoney(Math.abs(variance));
+}
+function showOptionalPayout(rowId) {
+  document.getElementById(rowId).style.display = 'block';
+  // Hide the corresponding add button
+  const btnMap = {'p-game-row':'btn-p-game','p-lotref-row':'btn-p-lotref','p-atm-row':'btn-p-atm'};
+  const btn = document.getElementById(btnMap[rowId]);
+  if(btn) btn.style.display = 'none';
+}
+function removeOptionalPayout(rowId, inputId) {
+  document.getElementById(rowId).style.display = 'none';
+  const el = document.getElementById(inputId);
+  if(el) el.value = '';
+  // Show the add button again
+  const btnMap = {'p-game-row':'btn-p-game','p-lotref-row':'btn-p-lotref','p-atm-row':'btn-p-atm'};
+  const btn = document.getElementById(btnMap[rowId]);
+  if(btn) btn.style.display = 'block';
+  calcPayouts();
 }
 function addCashPayoutRow() {
   const row = document.createElement('div');
@@ -1983,10 +2023,6 @@ function showSaveConfirm() {
   // Build rows - only show if has value
   const rows = [
     {label:'Cash Sales', val:f('s-cash'), section:'sales'},
-    {label:'Credit Card', val:f('s-credit'), section:'sales'},
-    {label:'Debit Card', val:f('s-debit'), section:'sales'},
-    {label:'EBT / Food Stamp', val:f('s-ebt'), section:'sales'},
-    {label:'Tax Collected', val:f('s-tax'), section:'sales'},
     {divider:true, label:'Payouts'},
     {label:'Cash Payouts Total', val:cashPayout, section:'payouts'},
     {label:'Lottery Payout', val:f('p-lottery'), section:'payouts', allowNeg:true},
@@ -1995,7 +2031,7 @@ function showSaveConfirm() {
     {label:'ATM Balance Add', val:f('p-atm'), section:'payouts'},
     {label:'Missing / Extra', val:f('p-misc'), section:'payouts', allowNeg:true},
     {divider:true, label:'Cash Deposit'},
-    {label:'POS Cash', val:f('d-pos'), section:'deposit'},
+    {label:'Cash from POS', val:f('d-pos'), section:'deposit'},
     {label:'Lottery Kiosk Cash', val:f('d-lottery'), section:'deposit'},
     {label:'Toy Machine Commission', val:f('d-toy'), section:'deposit'},
     {label:'Coin Game Commission', val:f('d-coin'), section:'deposit'},
@@ -2029,10 +2065,6 @@ function showSaveConfirm() {
 
   // Add totals section
   html += '<div style="height:0.5px;background:#e2e0d8;margin:10px 0"></div>';
-  html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
-    <span style="color:#6b6860">Net Sales</span>
-    <span style="font-family:'JetBrains Mono',monospace;font-weight:600;color:#1a5c3a">${fmt(netSales)}</span>
-  </div>`;
   html += `<div style="display:flex;justify-content:space-between;padding:4px 0">
     <span style="font-weight:600">Total Bank Deposit Today</span>
     <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:#1a5c3a">${fmt(depositTotal)}</span>
