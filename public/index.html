@@ -992,7 +992,9 @@ async function init() {
       transfer: {mgTxn:+r.moneygram_txn, mgDep:+r.moneygram_dep, brTxn:+r.boss_txn, brDep:+r.boss_dep},
       deposit: {pos:+r.deposit_pos, lottery:+r.deposit_lottery, toy:+r.deposit_toy,
                 coin:+r.deposit_coin, other:+r.deposit_other, total:+r.deposit_total},
-      specialty: r.specialty || [], notes: r.notes
+      specialty: r.specialty || [],
+      category_sales: (r.category_sales || []).filter(c => c.name !== 'BOSS RECARGAS'),
+      notes: r.notes
     }));
     machineReports = (machines || []).map(r => ({
       date: r.report_date, machines: r.machines,
@@ -1917,14 +1919,18 @@ function updateDashboard() {
   const sorted = [...dailyReports].filter(r=>r.date).sort((a,b)=>b.date.localeCompare(a.date));
   const last = sorted[0];
   if(last) {
-    document.getElementById('ls-date').textContent = last.date;
-    const lsNet = (last.sales?.cash||0)+(last.sales?.credit||0)+(last.sales?.debit||0)+(last.sales?.ebt||0)-(last.sales?.tax||0);
+    const _dp = last.date.split('-');
+    const _months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    document.getElementById('ls-date').textContent = _months[parseInt(_dp[1])-1] + ' ' + parseInt(_dp[2]) + ', ' + _dp[0];
+    const _bossLast = (last.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales || 0;
+    const lsNet = (last.sales?.cash||0)+(last.sales?.credit||0)+(last.sales?.debit||0)+(last.sales?.ebt||0)-(last.sales?.tax||0) - _bossLast;
     document.getElementById('ls-sales').textContent = fmtMoney(lsNet);
     // Purchases on that date
     const lastPurch = invoices.filter(i=>i.date===last.date).reduce((s,i)=>s+i.amount,0);
     document.getElementById('ls-purch').textContent = fmtMoney(lastPurch);
     // Top 5 categories
-    const lastCats = (last.category_sales||[]).filter(c=>c.netSales>0).sort((a,b)=>b.netSales-a.netSales).slice(0,5);
+    const _excludeCats = ['BOSS RECARGAS','Uncategorized','Misc'];
+    const lastCats = (last.category_sales||[]).filter(c=>c.netSales>0 && !_excludeCats.includes(c.name)).sort((a,b)=>b.netSales-a.netSales).slice(0,5);
     const catContainer = document.getElementById('ls-categories');
     if(lastCats.length) {
       const maxCat = lastCats[0].netSales;
@@ -1954,7 +1960,10 @@ function updateDashboard() {
   const monthReports = dailyReports.filter(r => r.date && r.date.startsWith(ym));
   const daysRecorded = monthReports.length;
   const salesMTD = monthReports.reduce((s,r) => {
-    return s + (r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0);
+    const gross = (r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0);
+    // BOSS RECARGAS is a money transfer service, not actual product sales - exclude it
+    const bossAmt = (r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales || 0;
+    return s + gross - bossAmt;
   }, 0);
   const monthInvoices = invoices.filter(i => i.date && i.date.startsWith(ym));
   const purchMTD = monthInvoices.reduce((s,i) => s+i.amount, 0);
@@ -1978,12 +1987,13 @@ function updateDashboard() {
   // Top 5 categories this month
   const catMap = {};
   monthReports.forEach(r => {
-    (r.category_sales||[]).forEach(c => {
+    (r.category_sales||[]).filter(c=>c.name!=='BOSS RECARGAS').forEach(c => {
       if(!catMap[c.name]) catMap[c.name] = 0;
       catMap[c.name] += c.netSales||0;
     });
   });
-  const topCats = Object.entries(catMap).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const _excl = ['BOSS RECARGAS','Uncategorized','Misc'];
+  const topCats = Object.entries(catMap).filter(([k,v])=>v>0 && !_excl.includes(k)).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const topCatEl = document.getElementById('d-top-cats');
   if(topCats.length) {
     const maxV = topCats[0][1];
