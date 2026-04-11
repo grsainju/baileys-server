@@ -1299,10 +1299,10 @@ async function savePrice(id, name) {
 // ---- CALCULATIONS ----
 function fmtMoney(v) { return '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
 function fmtDate(d) {
-  if(!d) return '—';
+  if(!d || d === '—') return '—';
   const parts = d.split('-');
   if(parts.length !== 3) return d;
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   return months[parseInt(parts[1])-1] + ' ' + parseInt(parts[2]) + ', ' + parts[0];
 }
 function getVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
@@ -1663,7 +1663,7 @@ async function checkExistingReport() {
       const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleTimeString() : '';
       if(indicator) {
         indicator.style.display = 'inline-block';
-        indicator.textContent = '✓ Saved at ' + savedAt;
+        indicator.textContent = '✓ Saved ' + fmtDate(savedAt.split('T')[0] || savedAt.split(',')[0]);
       }
     } else {
       if(indicator) indicator.style.display = 'none';
@@ -2108,7 +2108,7 @@ function filterInvoices() {
     </tr></thead><tbody>${
       filtered.map(inv => `<tr>
         <td>${inv.status==='unpaid' ? `<input type="checkbox" class="inv-cb-s" data-id="${inv.id}" data-amount="${inv.amount}" onchange="updateBulkBarSearch()">` : ''}</td>
-        <td>${inv.date}</td>
+        <td>${fmtDate(inv.date)}</td>
         <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
         <td>${inv.vendor}</td>
         <td class="num">${fmtMoney(inv.amount)}</td>
@@ -2181,12 +2181,7 @@ function renderInvoices() {
     unpaidContainer.innerHTML = '<div class="empty-state"><div>📄</div>No unpaid invoices</div>';
   } else {
     unpaidContainer.innerHTML = `
-      <div id="bulk-pay-bar" style="display:none;background:var(--green-l);border:0.5px solid var(--green-m);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none;align-items:center;gap:12px;flex-wrap:wrap">
-        <span style="font-size:13px;font-weight:500;color:var(--green)" id="bulk-selected-label">0 invoices selected</span>
-        <span style="font-size:13px;font-family:var(--mono);color:var(--green)" id="bulk-selected-total">$0.00</span>
-        <button onclick="bulkMarkPaid()" style="margin-left:auto;background:var(--green);color:white;border:none;padding:7px 16px;border-radius:6px;font-family:var(--font);font-size:13px;font-weight:600;cursor:pointer">Pay Selected</button>
-        <button onclick="clearSelection()" style="background:none;border:0.5px solid var(--border2);padding:7px 12px;border-radius:6px;font-family:var(--font);font-size:13px;cursor:pointer">Clear</button>
-      </div>
+
       <table class="inv-table"><thead><tr>
         <th style="width:32px"><input type="checkbox" id="select-all-cb" onclick="toggleSelectAll(this)"></th>
         <th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Notes</th><th></th>
@@ -2213,7 +2208,7 @@ function renderInvoices() {
   } else {
     allContainer.innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th>Paid Date</th><th>Notes</th><th></th></tr></thead><tbody>${
       invoices.map(inv => `<tr>
-        <td>${inv.date}</td>
+        <td>${fmtDate(inv.date)}</td>
         <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
         <td>${inv.vendor}</td>
         <td class="num">${fmtMoney(inv.amount)}</td>
@@ -2388,6 +2383,7 @@ function updateDashboard() {
   });
   const maxVal = Math.max(...weekData.map(d=>d.total), 1);
   buildCatPickers();
+  updateBusinessIntelligence();
   const weekTotal = weekData.reduce((s,d)=>s+d.total,0);
   document.getElementById('weekly-bars').innerHTML = weekData.map(d => {
     const pct = Math.round((d.total/maxVal)*100);
@@ -2864,8 +2860,8 @@ function exportInvoicesCSV() {
 function updateBusinessIntelligence() {
   const el = document.getElementById('bi-body');
   if(!el) return;
-  if(dailyReports.length < 5) {
-    el.innerHTML = '<div class="empty-state"><div>📊</div>Save at least 5 daily reports to unlock insights</div>';
+  if(dailyReports.length < 1) {
+    el.innerHTML = '<div class="empty-state"><div>📊</div>Save at least one daily report to see insights</div>';
     return;
   }
   const ym = _dashMonth || new Date().toISOString().slice(0,7);
