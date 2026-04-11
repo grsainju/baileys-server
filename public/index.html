@@ -662,6 +662,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 </div>
 <div class="toast" id="toast"></div>
 
+<!-- OVERWRITE MODAL -->
+<div id="overwrite-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px">Report Already Saved</div>
+    <div style="font-size:13px;color:#6b6860;margin-bottom:20px" id="overwrite-modal-msg"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="confirmOverwrite()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer">Overwrite</button>
+      <button onclick="document.getElementById('overwrite-modal').style.display='none'" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- REVERT MODAL -->
 <div id="revert-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
   <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
@@ -837,12 +849,29 @@ async function parseCloverCSV() {
     const hour = nowEST.getHours();
     const min = nowEST.getMinutes();
     const timeStr = `${hour % 12 || 12}:${min.toString().padStart(2,'0')} ${hour >= 12 ? 'PM' : 'AM'} EST`;
-    const proceed = confirm(`⚠️ Store may still be open\n\nCurrent time is ${timeStr}. Pulling data for today before the store closes may give incomplete sales numbers.\n\nIf you save this report now, you may miss sales that happen later today.\n\nContinue anyway?`);
-    if(!proceed) return;
+
   }
   btn.innerHTML = '<span>⟳</span> Pulling...';
   btn.style.opacity = '0.7';
   status.style.display = 'none';
+  // Clear all form fields before pulling fresh data
+  ['s-cash','s-credit','s-debit','s-ebt','s-tax','k-cash','k-credit','k-debit','k-ebt','k-tax',
+   'p-lottery','p-game','p-lotref','p-atm','p-misc',
+   'mg-txn','mg-dep','d-pos','d-lottery','d-toy','d-coin','d-other'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  // Clear cash payout rows - keep one empty row
+  document.getElementById('cash-payout-rows').innerHTML = `
+    <div class="cash-payout-row" style="display:grid;grid-template-columns:1fr 2fr auto;gap:8px;margin-bottom:8px;align-items:end">
+      <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" class="payout-amt" step="0.01" min="0" placeholder="0.00" oninput="calcPayouts()"></div></div>
+      <div class="fgroup"><label>Paid To / Notes</label><input type="text" class="payout-note" placeholder="e.g. Mi Mexico vendor payment"></div>
+      <button onclick="removeCashPayout(this)" style="background:none;border:0.5px solid var(--border2);border-radius:6px;padding:8px 10px;cursor:pointer;color:var(--muted);font-size:13px;margin-bottom:1px">✕</button>
+    </div>`;
+  document.getElementById('daily-notes').value = '';
+  calcSales(); calcKitchen(); calcPayouts(); calcTransfer(); calcDeposit();
+  window._pulledCategories = null;
+  const catCard = document.getElementById('category-sales-card');
+  if(catCard) catCard.style.display = 'none';
   try {
     const res = await fetch(`${API_BASE}/summary?date=${date}`);
     if(!res.ok) throw new Error('Server error ' + res.status);
@@ -1299,17 +1328,24 @@ async function submitDailyReport() {
   const date = document.getElementById('report-date').value;
 
   // Check if report already exists for this date
+  if(window._skipOverwriteCheck) {
+    window._skipOverwriteCheck = false;
+  } else {
   try {
     const existing = await apiGet('/api/daily?date=' + date);
     if(existing && existing.length > 0) {
       const rec = existing[0];
       const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleString() : 'earlier';
-      const proceed = confirm(`A report for ${date} was already saved (${savedAt}).\n\nOverwrite it with current data?`);
-      if(!proceed) return;
+      // Show styled modal instead of confirm()
+      document.getElementById('overwrite-modal-msg').textContent = `A report for ${date} was already saved (${savedAt}). Overwrite it with current data?`;
+      document.getElementById('overwrite-modal').style.display = 'flex';
+      window._pendingSubmitDate = date;
+      return; // will be resumed by confirmOverwrite()
     }
   } catch(e) {
     // If check fails, proceed with save
   }
+  } // end overwrite check
   const specialty = specialtyCategories.map((cat,i) => ({name: typeof cat==='object'?cat.name:cat, amount: getVal('sc-'+i)}));
   const cashRows = [...document.querySelectorAll('.payout-amt')];
   const cashPayout = cashRows.reduce((s,el) => s+(parseFloat(el.value)||0), 0);
@@ -1745,6 +1781,12 @@ function updateWeeklyReport() {
       return `<tr><td>${wk}</td><td class="num">${fmtMoney(w.sales)}</td><td class="num">${fmtMoney(w.purchases)}</td><td class="num" style="color:var(--green)">${fmtMoney(profit)}</td><td class="num">${margin}</td></tr>`;
     }).join('')
   }</tbody></table>`;
+}
+
+function confirmOverwrite() {
+  document.getElementById('overwrite-modal').style.display = 'none';
+  window._skipOverwriteCheck = true;
+  submitDailyReport();
 }
 
 function showToast(msg) {
