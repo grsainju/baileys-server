@@ -992,32 +992,32 @@ function calcPayouts() {
   calcCashVariance();
 }
 function calcCashVariance() {
-  const posCash = getVal('s-cash');
-  if(posCash === 0) {
+  const posCashDeposit = getVal('d-pos'); // What was physically deposited
+  const cashSales = getVal('s-cash');     // Cash collected from POS
+  if(cashSales === 0 && posCashDeposit === 0) {
     const bar = document.getElementById('cash-variance-bar');
     if(bar) bar.style.display = 'none';
     return;
   }
-  // Formula: Cash Sales - Cash Payouts + Lottery Payout - Game Winner - Lottery Refund - ATM - Missing/Extra
-  const cashRows = [...document.querySelectorAll('.payout-amt')];
-  const cashPayout = cashRows.reduce((s,el) => s + (parseFloat(el.value)||0), 0);
-  const lottery = getVal('p-lottery');    // can be negative
-  const game = getVal('p-game');          // positive only
-  const lotref = getVal('p-lotref');      // positive only
-  const atm = getVal('p-atm');            // positive only
-  const misc = getVal('p-misc');          // can be negative
-  const variance = posCash - cashPayout + lottery - game - lotref - atm + misc;
+  // Expected cash in register:
+  // Cash Sales + Lottery Payout - ATM Balance Add + Missing/Extra
+  // (Cash Payouts & Game Winner & Lottery Refund are paid out via POS, already reflected in Cash Sales)
+  const lottery = getVal('p-lottery');  // positive adds cash, negative reduces
+  const atm = getVal('p-atm');          // ATM top-up reduces cash in register
+  const misc = getVal('p-misc');        // positive adds, negative reduces
+  const expectedCash = cashSales + lottery - atm + misc;
+  // Variance = what you deposited minus what was expected
+  const variance = posCashDeposit - expectedCash;
   const bar = document.getElementById('cash-variance-bar');
   const label = document.getElementById('cash-variance-label');
   const val = document.getElementById('cash-variance-val');
   if(!bar) return;
-  if(Math.abs(variance) < 0.01) {
+  if(Math.abs(variance) < 0.005) {
     bar.style.display = 'none';
     return;
   }
   bar.style.display = 'flex';
   bar.style.background = 'none';
-  bar.style.borderColor = 'transparent';
   bar.style.border = 'none';
   label.style.color = variance < 0 ? 'var(--red)' : 'var(--muted)';
   val.style.color = variance < 0 ? 'var(--red)' : 'var(--text)';
