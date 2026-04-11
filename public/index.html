@@ -641,15 +641,27 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
       </div>
 
-      <!-- SECTION 3: CATEGORY PROJECTIONS (placeholder) -->
+      <!-- SECTION 3: CATEGORY PROJECTIONS -->
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
           <div class="card-icon" style="background:#fef3e2">📈</div>
-          <div class="card-title">Category Projections</div>
-          <div class="card-chevron">▼</div>
+          <div class="card-title">Category Tracker</div>
+          <div class="card-chevron open">▼</div>
         </div>
-        <div class="card-body" id="cat-proj-body">
-          <div class="empty-state"><div>📊</div>Coming soon</div>
+        <div class="card-body open" id="cat-proj-body">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Pick up to 3 categories to track monthly net sales.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+            <select id="cat-pick-1" onchange="saveCatPicks()" style="flex:1;min-width:150px;font-family:var(--font);font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
+              <option value="">— Category 1 —</option>
+            </select>
+            <select id="cat-pick-2" onchange="saveCatPicks()" style="flex:1;min-width:150px;font-family:var(--font);font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
+              <option value="">— Category 2 —</option>
+            </select>
+            <select id="cat-pick-3" onchange="saveCatPicks()" style="flex:1;min-width:150px;font-family:var(--font);font-size:13px;padding:7px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
+              <option value="">— Category 3 —</option>
+            </select>
+          </div>
+          <div id="cat-proj-results"></div>
         </div>
       </div>
 
@@ -993,7 +1005,7 @@ async function init() {
       deposit: {pos:+r.deposit_pos, lottery:+r.deposit_lottery, toy:+r.deposit_toy,
                 coin:+r.deposit_coin, other:+r.deposit_other, total:+r.deposit_total},
       specialty: r.specialty || [],
-      category_sales: (r.category_sales || []).filter(c => c.name !== 'BOSS RECARGAS'),
+      category_sales: (r.category_sales || []),
       notes: r.notes
     }));
     machineReports = (machines || []).map(r => ({
@@ -1916,7 +1928,9 @@ function updateDashboard() {
   document.getElementById('d-month-label').textContent = monthName;
 
   // --- SECTION 1: Last saved report ---
-  const sorted = [...dailyReports].filter(r=>r.date).sort((a,b)=>b.date.localeCompare(a.date));
+  // Find most recent day before today with data
+  const _todayStr = new Date().toISOString().split('T')[0];
+  const sorted = [...dailyReports].filter(r=>r.date && r.date < _todayStr).sort((a,b)=>b.date.localeCompare(a.date));
   const last = sorted[0];
   if(last) {
     const _dp = last.date.split('-');
@@ -2014,15 +2028,29 @@ function updateDashboard() {
   }
 
   // Weekly bars
-  const weekDays = [-6,-5,-4,-3,-2,-1,0].map(d => { const dt=new Date(); dt.setDate(dt.getDate()+d); return dt.toISOString().split('T')[0]; });
-  const weekData = weekDays.map(d => ({date:d, total:(dailyReports.find(r=>r.date===d)?.sales?.total||0)}));
+  // Week starts Monday - find this week's Monday
+  const _today = new Date();
+  const _dow = _today.getDay(); // 0=Sun,1=Mon...6=Sat
+  const _daysFromMon = (_dow === 0) ? 6 : _dow - 1; // days since Monday
+  const weekDays = [0,1,2,3,4,5,6].map(i => {
+    const dt = new Date(_today);
+    dt.setDate(_today.getDate() - _daysFromMon + i);
+    return dt.toISOString().split('T')[0];
+  });
+  const dayNames = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const weekData = weekDays.map((d,i) => {
+    const r = dailyReports.find(r=>r.date===d);
+    const boss = (r?.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;
+    const net = r ? (r.sales.cash+r.sales.credit+r.sales.debit+r.sales.ebt-r.sales.tax-boss) : 0;
+    return {date:d, total:net, label:dayNames[i]};
+  });
   const maxVal = Math.max(...weekData.map(d=>d.total), 1);
-  const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  document.getElementById('weekly-bars').innerHTML = weekData.length ? weekData.map(d => {
-    const day = dayNames[new Date(d.date+'T12:00:00').getDay()];
+  buildCatPickers();
+  document.getElementById('weekly-bars').innerHTML = weekData.map(d => {
     const pct = Math.round((d.total/maxVal)*100);
-    return `<div class="bar-row"><div class="bar-label">${day}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--green)"></div></div><div class="bar-val">${fmtMoney(d.total)}</div></div>`;
-  }).join('') : '<div class="empty-state" style="padding:20px">No data yet</div>';
+    const isToday = d.date === _todayStr;
+    return `<div class="bar-row"><div class="bar-label" style="${isToday?'font-weight:600;color:var(--green)':''}">${d.label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${d.total>0?'var(--green)':'var(--border)'}"></div></div><div class="bar-val">${d.total>0?fmtMoney(d.total):'—'}</div></div>`;
+  }).join('');
 }
 
 // ---- WEEKLY REPORT ----
@@ -2211,6 +2239,60 @@ function proceedSaveReport() {
   document.getElementById('save-confirm-modal').style.display = 'none';
   window._skipOverwriteCheck = false;
   submitDailyReport();
+}
+
+function buildCatPickers() {
+  // Get all unique category names from all reports (excluding BOSS/Misc/Uncategorized)
+  const exclude = ['BOSS RECARGAS','Uncategorized','Misc'];
+  const allCats = new Set();
+  dailyReports.forEach(r => (r.category_sales||[]).filter(c=>!exclude.includes(c.name)&&c.netSales>0).forEach(c=>allCats.add(c.name)));
+  const cats = [...allCats].sort();
+  const opts = '<option value="">— None —</option>' + cats.map(c=>`<option value="${c}">${c}</option>`).join('');
+  ['cat-pick-1','cat-pick-2','cat-pick-3'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const cur = sel.value;
+    sel.innerHTML = opts;
+    sel.value = cur; // restore selection
+  });
+  // Restore saved picks from localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('catPicks')||'[]');
+    saved.forEach((v,i) => { const el = document.getElementById(`cat-pick-${i+1}`); if(el) el.value=v||''; });
+  } catch(e){}
+  renderCatProjections();
+}
+
+function saveCatPicks() {
+  const picks = [1,2,3].map(i => document.getElementById(`cat-pick-${i}`)?.value||'');
+  try { localStorage.setItem('catPicks', JSON.stringify(picks)); } catch(e){}
+  renderCatProjections();
+}
+
+function renderCatProjections() {
+  const ym = _dashMonth || new Date().toISOString().slice(0,7);
+  const monthReports = dailyReports.filter(r=>r.date&&r.date.startsWith(ym));
+  const picks = [1,2,3].map(i=>document.getElementById(`cat-pick-${i}`)?.value||'').filter(Boolean);
+  const el = document.getElementById('cat-proj-results');
+  if(!el) return;
+  if(!picks.length) { el.innerHTML='<div class="empty-state" style="padding:16px"><div>📊</div>Select categories above to track</div>'; return; }
+  const [yr,mo] = ym.split('-').map(Number);
+  const monthName = new Date(yr,mo-1,1).toLocaleString('default',{month:'long',year:'numeric'});
+  el.innerHTML = picks.map(cat => {
+    const total = monthReports.reduce((s,r) => {
+      const c = (r.category_sales||[]).find(c=>c.name===cat);
+      return s + (c?.netSales||0);
+    }, 0);
+    const days = monthReports.filter(r=>(r.category_sales||[]).some(c=>c.name===cat&&c.netSales>0)).length;
+    const avg = days > 0 ? total/days : 0;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface2);border-radius:8px;margin-bottom:8px;border:0.5px solid var(--border)">
+      <div>
+        <div style="font-size:13px;font-weight:600">${cat}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${days} days · avg ${fmtMoney(avg)}/day · ${monthName}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:18px;font-weight:600;color:var(--green)">${fmtMoney(total)}</div>
+    </div>`;
+  }).join('');
 }
 
 function showToast(msg) {
