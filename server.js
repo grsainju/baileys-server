@@ -381,7 +381,7 @@ const server = http.createServer((req, res) => {
     const date = parsed.query.date;
     let query = '?store=eq.baileys&order=report_date.desc';
     if (date) query = `?store=eq.baileys&report_date=eq.${date}`;
-    else if (month) query = `?store=eq.baileys&report_date=gte.${month}-01&report_date=lte.${month}-31&order=report_date.desc`;
+    else if (month) { const [yr,mo]=month.split('-').map(Number); const nm=mo===12?`${yr+1}-01`:`${yr}-${String(mo+1).padStart(2,'0')}`; query=`?store=eq.baileys&report_date=gte.${month}-01&report_date=lt.${nm}-01&order=report_date.desc`; }
     supabase('GET', 'daily_reports', query, null, (err, data, status) => {
       if (err) { json({error: err.message}, 500); return; }
       json(data, status);
@@ -408,7 +408,7 @@ const server = http.createServer((req, res) => {
     const date = parsed.query.date;
     let query = '?store=eq.baileys&order=report_date.desc&limit=1';
     if (date) query = `?store=eq.baileys&report_date=eq.${date}`;
-    else if (month) query = `?store=eq.baileys&report_date=gte.${month}-01&report_date=lte.${month}-31&order=report_date.desc`;
+    else if (month) { const [yr,mo]=month.split('-').map(Number); const nm=mo===12?`${yr+1}-01`:`${yr}-${String(mo+1).padStart(2,'0')}`; query=`?store=eq.baileys&report_date=gte.${month}-01&report_date=lt.${nm}-01&order=report_date.desc`; }
     supabase('GET', 'machine_reports', query, null, (err, data, status) => {
       if (err) { json({error: err.message}, 500); return; }
       json(data, status);
