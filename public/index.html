@@ -347,12 +347,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
       </div>
 
-      <!-- CASH SHORT/OVER -->
-      <div id="cash-variance-bar" style="display:none;padding:10px 14px;border-radius:var(--r);margin-bottom:12px;border:0.5px solid;display:flex;align-items:center;justify-content:space-between">
-        <span style="font-size:13px;font-weight:500" id="cash-variance-label"></span>
-        <span style="font-family:var(--mono);font-size:16px;font-weight:600" id="cash-variance-val"></span>
-      </div>
-
       <!-- MONEY TRANSFER -->
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
@@ -396,6 +390,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <div style="display:flex;justify-content:space-between;align-items:center;background:var(--green-l);border-radius:7px;padding:10px 12px;margin-top:4px">
             <span style="font-size:14px;color:var(--green);font-weight:700">Total Bank Deposit Today</span>
             <span style="font-family:var(--mono);font-size:20px;font-weight:700;color:var(--green)" id="total-deposit">$0.00</span>
+          </div>
+          <!-- CASH SHORT/OVER - shown below bank deposit -->
+          <div id="cash-variance-bar" style="display:none;margin-top:10px;padding:10px 12px;border-radius:7px;border:0.5px solid;align-items:center;justify-content:space-between">
+            <span style="font-size:13px;font-weight:600" id="cash-variance-label"></span>
+            <span style="font-family:var(--mono);font-size:16px;font-weight:700" id="cash-variance-val"></span>
           </div>
         </div>
       </div>
@@ -722,12 +721,18 @@ function login(role) {
   userRole = role;
   document.getElementById('auth-screen').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  // Reset all pages first
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   buildNav();
   init();
-  // Owner lands on dashboard, staff lands on daily report
+  // Route to correct first page
   if(role === 'owner') {
     const dashBtn = document.querySelector('.nav-btn.owner-only');
-    if(dashBtn) showPage('dashboard', dashBtn);
+    if(dashBtn) { showPage('dashboard', dashBtn); }
+  } else {
+    const dailyBtn = document.querySelector('.nav-btn');
+    if(dailyBtn) { showPage('daily', dailyBtn); }
   }
 }
 function logout() {
@@ -744,6 +749,8 @@ function buildNav() {
   nav.querySelector('.nav-btn').classList.add('active');
 }
 function showPage(id, btn) {
+  // Block staff from owner pages
+  if(userRole === 'staff' && ['dashboard','reports','prices'].includes(id)) return;
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
@@ -802,7 +809,7 @@ async function init() {
     }));
   } catch(e) {
     console.warn('Could not load from database:', e.message);
-    showToast('Warning: using local data only');
+    console.warn('Using local data only - DB connection issue');
   }
 
   buildMachineGrid();
@@ -994,7 +1001,7 @@ function calcCashVariance() {
   const label = document.getElementById('cash-variance-label');
   const val = document.getElementById('cash-variance-val');
   if(!bar) return;
-  if(Math.abs(variance) < 0.01) {
+  if(Math.abs(variance) < 0.01 || posCash === 0) {
     bar.style.display = 'none';
     return;
   }
@@ -1004,14 +1011,14 @@ function calcCashVariance() {
     bar.style.borderColor = 'var(--green-m)';
     label.style.color = 'var(--green)';
     val.style.color = 'var(--green)';
-    label.textContent = 'Cash Over';
+    label.textContent = '✓ Cash Over';
     val.textContent = '+' + fmtMoney(variance);
   } else {
     bar.style.background = 'var(--red-l)';
     bar.style.borderColor = '#f09595';
     label.style.color = 'var(--red)';
     val.style.color = 'var(--red)';
-    label.textContent = 'Cash Short';
+    label.textContent = '⚠ Cash Short';
     val.textContent = '-' + fmtMoney(Math.abs(variance));
   }
 }
@@ -1045,6 +1052,7 @@ function calcDeposit() {
   const t = getVal('d-pos')+getVal('d-lottery')+getVal('d-toy')+getVal('d-coin')+getVal('d-other');
   document.getElementById('total-deposit').textContent = fmtMoney(t);
   document.getElementById('badge-deposit').textContent = fmtMoney(t);
+  calcCashVariance();
 }
 
 // ---- SPECIALTY ----
