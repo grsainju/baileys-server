@@ -1422,24 +1422,20 @@ async function submitDailyReport() {
   const date = document.getElementById('report-date').value;
 
   // Check if report already exists for this date
-  if(window._skipOverwriteCheck) {
-    window._skipOverwriteCheck = false;
-  } else {
-  try {
-    const existing = await apiGet('/api/daily?date=' + date);
-    if(existing && existing.length > 0) {
-      const rec = existing[0];
-      const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleString() : 'earlier';
-      // Show styled modal instead of confirm()
-      document.getElementById('overwrite-modal-msg').textContent = `A report for ${date} was already saved (${savedAt}). Overwrite it with current data?`;
-      document.getElementById('overwrite-modal').style.display = 'flex';
-      window._pendingSubmitDate = date;
-      return; // will be resumed by confirmOverwrite()
-    }
-  } catch(e) {
-    // If check fails, proceed with save
+  if(!window._skipOverwriteCheck) {
+    try {
+      const existing = await apiGet('/api/daily?date=' + date);
+      if(existing && existing.length > 0) {
+        const rec = existing[0];
+        const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleString() : 'earlier';
+        document.getElementById('overwrite-modal-msg').textContent = `A report for ${date} was already saved (${savedAt}). Overwrite it with current data?`;
+        document.getElementById('overwrite-modal').style.display = 'flex';
+        window._pendingSubmitDate = date;
+        return;
+      }
+    } catch(e) { /* proceed if check fails */ }
   }
-  } // end overwrite check
+  window._skipOverwriteCheck = false;
   const specialty = specialtyCategories.map((cat,i) => ({name: typeof cat==='object'?cat.name:cat, amount: getVal('sc-'+i)}));
   const cashRows = [...document.querySelectorAll('.payout-amt')];
   const cashPayout = cashRows.reduce((s,el) => s+(parseFloat(el.value)||0), 0);
