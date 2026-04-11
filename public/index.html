@@ -254,7 +254,8 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 
       <div class="date-bar">
         <label>Report Date</label>
-        <input type="date" id="report-date">
+        <input type="date" id="report-date" onchange="checkExistingReport()">
+        <span id="report-exists-badge" style="display:none;font-size:12px;padding:4px 10px;background:var(--green-l);color:var(--green);border-radius:20px;font-weight:500"></span>
         <div class="clover-btn" onclick="parseCloverCSV()" id="clover-pull-btn">
           <span>↓</span> Pull from Clover
         </div>
@@ -1263,8 +1264,40 @@ async function saveMachines() {
 }
 
 // ---- DAILY REPORT SAVE ----
+
+async function checkExistingReport() {
+  const date = document.getElementById('report-date').value;
+  if(!date) return;
+  try {
+    const existing = await apiGet('/api/daily?date=' + date);
+    const indicator = document.getElementById('report-exists-badge');
+    if(existing && existing.length > 0) {
+      const rec = existing[0];
+      const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleTimeString() : '';
+      if(indicator) {
+        indicator.style.display = 'inline-block';
+        indicator.textContent = '✓ Saved at ' + savedAt;
+      }
+    } else {
+      if(indicator) indicator.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
 async function submitDailyReport() {
   const date = document.getElementById('report-date').value;
+  // Check if report already exists for this date
+  try {
+    const existing = await apiGet('/api/daily?date=' + date);
+    if(existing && existing.length > 0) {
+      const rec = existing[0];
+      const savedAt = rec.updated_at ? new Date(rec.updated_at).toLocaleString() : 'earlier';
+      const proceed = confirm(`A report for ${date} was already saved (${savedAt}).\n\nOverwrite it with current data?`);
+      if(!proceed) return;
+    }
+  } catch(e) {
+    // If check fails, proceed with save
+  }
   const specialty = specialtyCategories.map((name,i) => ({name, amount: getVal('sc-'+i)}));
   const rec = {
     date,
