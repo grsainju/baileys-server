@@ -266,7 +266,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <div class="card">
         <div class="card-head" onclick="toggleCard(this)">
           <div class="card-icon" style="background:#e8f4ed">💰</div>
-          <div class="card-title">All POS Sales</div>
+          <div class="card-title">All POS Sales <span id="store-open-note" style="display:none;font-size:11px;color:#b8600a;font-weight:400">⚠ Store may still be open — numbers not final</span></div>
           <div class="card-badge tag tag-green" id="badge-sales">$0.00</div>
           <div class="card-chevron open">▼</div>
         </div>
@@ -1297,17 +1297,6 @@ async function checkExistingReport() {
 
 async function submitDailyReport() {
   const date = document.getElementById('report-date').value;
-
-  // Warn if saving today's report before 11pm EST
-  const nowEST2 = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
-  const todayEST2 = nowEST2.toISOString().split('T')[0];
-  if(date === todayEST2 && nowEST2.getHours() < 23) {
-    const hour2 = nowEST2.getHours();
-    const min2 = nowEST2.getMinutes();
-    const timeStr2 = `${hour2 % 12 || 12}:${min2.toString().padStart(2,'0')} ${hour2 >= 12 ? 'PM' : 'AM'} EST`;
-    const proceed = confirm(`⚠️ Saving incomplete report?\n\nCurrent time is ${timeStr2}. The store appears to still be open.\n\nSaving now will record incomplete data for today. Are you sure?`);
-    if(!proceed) return;
-  }
 
   // Check if report already exists for this date
   try {
