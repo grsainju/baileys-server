@@ -502,6 +502,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <option value="paid">Paid Only</option>
         </select>
         <button onclick="clearInvSearch()" style="background:none;border:0.5px solid var(--border2);padding:8px 12px;border-radius:7px;font-family:var(--font);font-size:13px;color:var(--muted);cursor:pointer">Clear</button>
+        <button onclick="exportInvoicesCSV()" style="background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:8px 14px;border-radius:7px;font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer">⬇ Export CSV</button>
       </div>
 
       <!-- SEARCH RESULTS (shown when searching) -->
@@ -611,6 +612,11 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
           <div style="font-family:var(--mono);font-size:22px;font-weight:700;color:var(--amber)" id="d-unpaid-amt">$0</div>
         </div>
 
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+          <div class="metric"><div class="metric-label">Total Repair Cost</div><div class="metric-val" id="d-repair-mtd">$0</div><div class="metric-sub">This month</div></div>
+          <div class="metric"><div class="metric-label">Office Supplies</div><div class="metric-val" id="d-office-mtd">$0</div><div class="metric-sub">This month</div></div>
+        </div>
+
         <!-- Top 5 categories for the month -->
         <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:8px">Top 5 Categories This Month</div>
         <div id="d-top-cats">
@@ -646,6 +652,18 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       <div class="chart-bar-wrap">
         <div class="chart-title">This Week — Daily Sales</div>
         <div id="weekly-bars"><div class="empty-state" style="padding:20px">No data yet</div></div>
+      </div>
+
+      <!-- SECTION 5: BUSINESS INTELLIGENCE -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#f1efea">🧠</div>
+          <div class="card-title">Business Intelligence</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open" id="bi-body">
+          <div class="empty-state"><div>📊</div>Save more daily reports to unlock insights</div>
+        </div>
       </div>
     </div>
 
@@ -1280,6 +1298,13 @@ async function savePrice(id, name) {
 
 // ---- CALCULATIONS ----
 function fmtMoney(v) { return '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+function fmtDate(d) {
+  if(!d) return '—';
+  const parts = d.split('-');
+  if(parts.length !== 3) return d;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(parts[1])-1] + ' ' + parseInt(parts[2]) + ', ' + parts[0];
+}
 function getVal(id) { return parseFloat(document.getElementById(id)?.value) || 0; }
 
 function renderCategorySection(cats, totalNet) {
@@ -2089,7 +2114,10 @@ function filterInvoices() {
         <td class="num">${fmtMoney(inv.amount)}</td>
         <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
         <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
-        <td>${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button>` : `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>`}</td>
+        <td style="display:flex;gap:4px">
+          <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')" style="background:var(--blue-l);color:var(--blue);border-color:var(--blue)">Edit</button>
+          ${inv.status==='unpaid' ? `<button class="item-save" onclick="markPaid('${inv.id}')">Pay</button>` : `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>`}
+        </td>
       </tr>`).join('')
     }</tbody></table>`;
 }
@@ -2139,6 +2167,11 @@ function bulkMarkPaidSearch() {
 }
 
 function renderInvoices() {
+  // Sort invoices by date desc then vendor asc
+  invoices.sort((a,b) => {
+    const dc = (b.date||'').localeCompare(a.date||'');
+    return dc !== 0 ? dc : (a.vendor||'').localeCompare(b.vendor||'');
+  });
   const unpaid = invoices.filter(i => i.status==='unpaid');
   const unpaidTotal = unpaid.reduce((s,i) => s+i.amount, 0);
   document.getElementById('badge-unpaid').textContent = `${unpaid.length} — ${fmtMoney(unpaidTotal)}`;
@@ -2273,7 +2306,14 @@ function updateDashboard() {
     return s + gross - bossAmt;
   }, 0);
   const monthInvoices = invoices.filter(i => i.date && i.date.startsWith(ym));
-  const purchMTD = monthInvoices.reduce((s,i) => s+i.amount, 0);
+  // Only Purchase type for main purchase metric
+  const getPurchaseType = (inv) => {
+    const v = vendorList.find(vl=>vl.name===inv.vendor);
+    return v?.type || 'Purchase';
+  };
+  const purchMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Purchase').reduce((s,i)=>s+i.amount,0);
+  const repairMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Repair').reduce((s,i)=>s+i.amount,0);
+  const officeMTD = monthInvoices.filter(i=>getPurchaseType(i)==='Office Supplies').reduce((s,i)=>s+i.amount,0);
   const machMTD = machineReports.filter(r => r.date && r.date.startsWith(ym)).reduce((s,r) => s+(r.storeIncome||0), 0);
   const margin = salesMTD > 0 ? ((salesMTD - purchMTD)/salesMTD*100).toFixed(1) : null;
   const avgSale = daysRecorded > 0 ? salesMTD/daysRecorded : 0;
@@ -2294,6 +2334,10 @@ function updateDashboard() {
   document.getElementById('d-machine-inc').textContent = fmtMoney(machMTD);
   document.getElementById('d-unpaid-amt').textContent = fmtMoney(unpaidAmt);
   document.getElementById('d-unpaid-count').textContent = unpaid.length+' invoice'+(unpaid.length!==1?'s':'');
+  const repairEl = document.getElementById('d-repair-mtd');
+  const officeEl = document.getElementById('d-office-mtd');
+  if(repairEl) repairEl.textContent = fmtMoney(repairMTD);
+  if(officeEl) officeEl.textContent = fmtMoney(officeMTD);
   document.getElementById('d-sales-days').textContent = daysRecorded+' day'+(daysRecorded!==1?'s':'')+' recorded';
 
   // Top 5 categories this month
@@ -2344,11 +2388,16 @@ function updateDashboard() {
   });
   const maxVal = Math.max(...weekData.map(d=>d.total), 1);
   buildCatPickers();
+  const weekTotal = weekData.reduce((s,d)=>s+d.total,0);
   document.getElementById('weekly-bars').innerHTML = weekData.map(d => {
     const pct = Math.round((d.total/maxVal)*100);
     const isToday = d.date === _todayStr;
     return `<div class="bar-row"><div class="bar-label" style="${isToday?'font-weight:600;color:var(--green)':''}">${d.label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${d.total>0?'var(--green)':'var(--border)'}"></div></div><div class="bar-val">${d.total>0?fmtMoney(d.total):'—'}</div></div>`;
-  }).join('');
+  }).join('') + `<div class="bar-row" style="border-top:0.5px solid var(--border);margin-top:6px;padding-top:6px">
+    <div class="bar-label" style="font-weight:600">Total</div>
+    <div class="bar-track"><div class="bar-fill" style="width:100%;background:var(--green-m)"></div></div>
+    <div class="bar-val" style="font-weight:600;color:var(--green)">${fmtMoney(weekTotal)}</div>
+  </div>`;
 }
 
 // ---- WEEKLY REPORT ----
@@ -2678,7 +2727,6 @@ let vendorList = [];
 function selectInvPayType(val) {
   document.getElementById('inv-paytype').value = val;
   document.querySelectorAll('input[name="inv-pt"]').forEach(r => r.checked = r.value === val);
-  // Highlight selected label
   document.querySelectorAll('label[onclick^="selectInvPayType"]').forEach(l => {
     const r = l.querySelector('input[type="radio"]');
     l.style.borderColor = r?.value === val && val ? 'var(--green)' : 'var(--border2)';
@@ -2686,6 +2734,9 @@ function selectInvPayType(val) {
   });
   document.getElementById('inv-check-row').style.display = val === 'check' ? 'block' : 'none';
   if(val !== 'check') document.getElementById('inv-check-num').value = '';
+  // Auto-set status to Paid when pay type selected, Unpaid when cleared
+  const statusEl = document.getElementById('inv-status');
+  if(statusEl) statusEl.value = val ? 'paid' : 'unpaid';
 }
 
 function addVendor() {
@@ -2787,6 +2838,157 @@ function renderVendorList(openEditId='') {
           </div>
         </div>`).join('')}
     </div>`).join('');
+}
+
+function exportInvoicesCSV() {
+  const headers = ['Date','Invoice #','Vendor','Type','Amount','Status','Pay Type','Check #','Paid Date','Notes'];
+  const rows = invoices.map(inv => {
+    const type = vendorList.find(v=>v.name===inv.vendor)?.type||'';
+    return [
+      inv.date||'', inv.num||'', inv.vendor||'', type,
+      inv.amount||0, inv.status||'', inv.paytype||'',
+      inv.checkNumber||'', inv.paidDate||'', (inv.notes||'').replace(/,/g,' ')
+    ];
+  });
+  const csv = [headers, ...rows].map(r=>r.join(',')).join('
+');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `baileys-invoices-${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Invoices exported to CSV');
+}
+
+function updateBusinessIntelligence() {
+  const el = document.getElementById('bi-body');
+  if(!el) return;
+  if(dailyReports.length < 5) {
+    el.innerHTML = '<div class="empty-state"><div>📊</div>Save at least 5 daily reports to unlock insights</div>';
+    return;
+  }
+  const ym = _dashMonth || new Date().toISOString().slice(0,7);
+  const monthReports = dailyReports.filter(r=>r.date&&r.date.startsWith(ym));
+  const allReports = [...dailyReports].sort((a,b)=>a.date.localeCompare(b.date));
+  const exclude = ['BOSS RECARGAS','Uncategorized','Misc'];
+
+  // Day of week analysis (0=Mon...6=Sun)
+  const dowNames = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const dowSales = Array(7).fill(0);
+  const dowCount = Array(7).fill(0);
+  allReports.forEach(r => {
+    const d = new Date(r.date+'T12:00:00');
+    const dow = (d.getDay()+6)%7; // Mon=0
+    const boss = (r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;
+    const net = (r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;
+    dowSales[dow] += net;
+    dowCount[dow]++;
+  });
+  const dowAvg = dowSales.map((s,i)=>dowCount[i]>0?s/dowCount[i]:0);
+  const maxDow = Math.max(...dowAvg);
+  const minDow = Math.min(...dowAvg.filter(v=>v>0));
+  const bestDay = dowNames[dowAvg.indexOf(maxDow)];
+  const worstDay = dowNames[dowAvg.findIndex(v=>v===minDow)];
+
+  // Top categories this month
+  const catTotals = {};
+  monthReports.forEach(r=>(r.category_sales||[]).filter(c=>!exclude.includes(c.name)).forEach(c=>{
+    if(!catTotals[c.name]) catTotals[c.name]=0;
+    catTotals[c.name]+=c.netSales||0;
+  }));
+  const topCats = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,3);
+  const totalCatSales = Object.values(catTotals).reduce((s,v)=>s+v,0);
+
+  // Month over month trend (last 2 months)
+  const now = new Date();
+  const prevYm = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
+  const prevReports = dailyReports.filter(r=>r.date&&r.date.startsWith(prevYm));
+  const curSales = monthReports.reduce((s,r)=>{const boss=(r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;return s+(r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;},0);
+  const prevSales = prevReports.reduce((s,r)=>{const boss=(r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;return s+(r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;},0);
+  const momPct = prevSales>0?((curSales-prevSales)/prevSales*100).toFixed(1):null;
+
+  // Cash vs card ratio
+  const totalCash = allReports.reduce((s,r)=>s+(r.sales?.cash||0),0);
+  const totalCard = allReports.reduce((s,r)=>s+(r.sales?.credit||0)+(r.sales?.debit||0),0);
+  const cashPct = (totalCash+totalCard)>0?Math.round(totalCash/(totalCash+totalCard)*100):0;
+
+  // Build HTML
+  const [yr2,mo2] = ym.split('-').map(Number);
+  const monthName = new Date(yr2,mo2-1,1).toLocaleString('default',{month:'long',year:'numeric'});
+
+  let html = '';
+
+  // Day of week chart
+  html += `<div style="margin-bottom:18px">
+    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">📅 Sales by Day of Week (All Time Avg)</div>
+    ${dowAvg.map((avg,i)=>{
+      const pct=maxDow>0?Math.round(avg/maxDow*100):0;
+      const isBest=avg===maxDow;
+      const isWorst=avg===minDow&&avg>0;
+      return `<div class="bar-row">
+        <div class="bar-label" style="font-size:12px;${isBest?'color:var(--green);font-weight:600':''}${isWorst?'color:var(--red)':''}">${dowNames[i].slice(0,3)}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${isBest?'var(--green)':isWorst?'var(--red-l)':'var(--green-m)'}"></div></div>
+        <div class="bar-val" style="font-size:12px;${isBest?'color:var(--green);font-weight:600':''}">${avg>0?fmtMoney(avg):'—'}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  // Key insights
+  html += `<div style="margin-bottom:18px">
+    <div style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:10px">💡 Key Insights</div>
+    <div style="display:flex;flex-direction:column;gap:8px">`;
+
+  // Best/worst day
+  html += `<div style="padding:10px 12px;background:var(--green-l);border-radius:8px;border:0.5px solid var(--green-m)">
+    <div style="font-size:12px;font-weight:600;color:var(--green)">🏆 Best Day: ${bestDay}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px">Avg ${fmtMoney(maxDow)} · Consider stocking up and scheduling more staff on ${bestDay}s</div>
+  </div>`;
+  html += `<div style="padding:10px 12px;background:var(--red-l);border-radius:8px;border:0.5px solid #f09595">
+    <div style="font-size:12px;font-weight:600;color:var(--red)">📉 Slowest Day: ${worstDay}</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px">Avg ${fmtMoney(minDow)} · Use ${worstDay}s for restocking, deep cleaning, vendor meetings</div>
+  </div>`;
+
+  // Month trend
+  if(momPct !== null) {
+    const up = parseFloat(momPct)>=0;
+    html += `<div style="padding:10px 12px;background:${up?'var(--green-l)':'var(--amber-l)'};border-radius:8px;border:0.5px solid ${up?'var(--green-m)':'#f5c26b'}">
+      <div style="font-size:12px;font-weight:600;color:${up?'var(--green)':'var(--amber)'}">${up?'📈':'📉'} Month vs Last Month: ${up?'+':''}${momPct}%</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px">${up?'Sales are trending up. Maintain current stock levels and promotions.':'Sales dipped vs last month. Review top categories and consider promotions.'}</div>
+    </div>`;
+  }
+
+  // Cash vs card
+  html += `<div style="padding:10px 12px;background:var(--surface2);border-radius:8px;border:0.5px solid var(--border)">
+    <div style="font-size:12px;font-weight:600;color:var(--text)">💵 Payment Mix: ${cashPct}% Cash · ${100-cashPct}% Card</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:2px">${cashPct>70?'Heavy cash business — ensure safe is managed daily and deposits are timely.':cashPct>50?'Balanced mix — good for reducing cash handling risk.':'Card-heavy — lower cash handling risk but monitor processing fees.'}</div>
+  </div>`;
+
+  // Top categories driving sales
+  if(topCats.length) {
+    const topPct = totalCatSales>0?Math.round(topCats[0][1]/totalCatSales*100):0;
+    html += `<div style="padding:10px 12px;background:var(--blue-l);border-radius:8px;border:0.5px solid #b8cef5">
+      <div style="font-size:12px;font-weight:600;color:var(--blue)">🛒 Sales Drivers in ${monthName}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${topCats.map(([name,val])=>`<span style="font-weight:500;color:var(--text)">${name}</span> ${fmtMoney(val)}`).join(' · ')}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:3px">${topCats[0][0]} alone accounts for ${topPct}% of tracked sales. ${topPct>40?`High concentration — consider expanding ${topCats[1]?topCats[1][0]:'other categories'} to reduce dependency.`:'Well-diversified category mix.'}</div>
+    </div>`;
+  }
+
+  // Action recommendations
+  html += `<div style="padding:10px 12px;background:#f0eafa;border-radius:8px;border:0.5px solid #c8b0e8">
+    <div style="font-size:12px;font-weight:600;color:#5a3a8a">🎯 Recommendations for Bailey's</div>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.7">
+      • <strong>Stock up on ${topCats[0]?topCats[0][0]:'top categories'}</strong> — your biggest revenue driver<br>
+      • <strong>Schedule extra staff on ${bestDay}s</strong> — your peak day<br>
+      • <strong>Run promotions on ${worstDay}s</strong> — to lift your slowest day<br>
+      • <strong>Track purchases vs sales margin</strong> — aim to keep purchases under 65% of net sales<br>
+      • <strong>Monitor cash deposits daily</strong> — ${cashPct}% of your sales are cash
+    </div>
+  </div>`;
+
+  html += '</div></div>';
+  el.innerHTML = html;
 }
 
 function showToast(msg) {
