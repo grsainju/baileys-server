@@ -495,7 +495,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 
       <!-- INVOICE SEARCH BAR -->
       <div style="background:var(--surface);border:0.5px solid var(--border);border-radius:var(--r);padding:12px 15px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <input type="text" id="inv-search" placeholder="Search by vendor name..." style="flex:1;min-width:180px;font-family:var(--font);font-size:14px;padding:8px 12px;border:0.5px solid var(--border2);border-radius:7px;outline:none" oninput="filterInvoices()">
+        <input type="text" id="inv-search" placeholder="Search by vendor, invoice #, or amount..." style="flex:1;min-width:180px;font-family:var(--font);font-size:14px;padding:8px 12px;border:0.5px solid var(--border2);border-radius:7px;outline:none" oninput="filterInvoices()">
         <select id="inv-filter-status" style="font-family:var(--font);font-size:13px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white" onchange="filterInvoices()">
           <option value="all">All Invoices</option>
           <option value="unpaid">Unpaid Only</option>
@@ -785,6 +785,49 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       </div>
     </div>
 
+    <!-- VENDOR MANAGER PAGE (OWNER) -->
+    <div class="page" id="page-vendors">
+      <div class="page-header">
+        <div class="page-title">Vendor Manager</div>
+        <div class="page-sub">Add, edit, and categorize your vendors</div>
+      </div>
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#eaf0fb">➕</div>
+          <div class="card-title">Add Vendor</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open">
+          <div class="form-grid fg-3">
+            <div class="fgroup"><label>Vendor Name</label><input type="text" id="vm-name" placeholder="e.g. Mi Mexico"></div>
+            <div class="fgroup"><label>Type / Category</label>
+              <select id="vm-type" style="font-family:var(--font);font-size:14px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white;width:100%">
+                <option value="">— Select type —</option>
+                <option value="Purchase">Purchase</option>
+                <option value="Repair">Repair</option>
+                <option value="Office Supplies">Office Supplies</option>
+                <option value="Utilities">Utilities</option>
+                <option value="Services">Services</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="fgroup"><label>Notes</label><input type="text" id="vm-notes" placeholder="Optional notes"></div>
+          </div>
+          <button class="submit-btn" onclick="addVendor()" style="margin-top:4px">Add Vendor</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#e8f4ed">📋</div>
+          <div class="card-title">All Vendors</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open" id="vendor-list-body">
+          <div class="empty-state"><div>🏪</div>No vendors yet</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -855,13 +898,27 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       </div>
       <div class="fgroup">
         <label>Pay Type</label>
-        <select id="inv-paytype" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white;width:100%">
-          <option value="">— Leave blank if unpaid —</option>
-          <option value="cash">Cash</option>
-          <option value="credit">Credit Card</option>
-          <option value="check">Check</option>
-          <option value="ach">ACH</option>
-        </select>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:0.5px solid var(--border2);border-radius:7px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text)" onclick="selectInvPayType('')">
+            <input type="radio" name="inv-pt" value="" style="accent-color:var(--green)"> None
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:0.5px solid var(--border2);border-radius:7px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text)" onclick="selectInvPayType('cash')">
+            <input type="radio" name="inv-pt" value="cash" style="accent-color:var(--green)"> 💵 Cash
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:0.5px solid var(--border2);border-radius:7px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text)" onclick="selectInvPayType('credit')">
+            <input type="radio" name="inv-pt" value="credit" style="accent-color:var(--green)"> 💳 Credit Card
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:0.5px solid var(--border2);border-radius:7px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text)" onclick="selectInvPayType('check')">
+            <input type="radio" name="inv-pt" value="check" style="accent-color:var(--green)"> 📝 Check
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:9px 12px;border:0.5px solid var(--border2);border-radius:7px;cursor:pointer;text-transform:none;font-size:14px;font-weight:400;color:var(--text)" onclick="selectInvPayType('ach')">
+            <input type="radio" name="inv-pt" value="ach" style="accent-color:var(--green)"> 🏦 ACH
+          </label>
+        </div>
+        <input type="hidden" id="inv-paytype" value="">
+        <div id="inv-check-row" style="display:none;margin-top:8px">
+          <input type="text" id="inv-check-num" placeholder="Check number" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--green);border-radius:7px;outline:none;width:100%">
+        </div>
       </div>
       <div class="fgroup">
         <label>Notes</label>
@@ -956,6 +1013,7 @@ const OWNER_TABS = [
   {id:'reports', label:'Weekly Reports', owner:true},
   {id:'prices', label:'Price Manager', owner:true},
   {id:'edit', label:'Edit Reports', owner:true},
+  {id:'vendors', label:'Vendor Manager', owner:true},
 ];
 
 function login(role) {
@@ -999,6 +1057,7 @@ function showPage(id, btn) {
   if(id==='dashboard') updateDashboard();
   if(id==='reports') updateWeeklyReport();
   if(id==='invoices') renderInvoices();
+  if(id==='vendors') { loadVendorData(); renderVendorList(); }
 }
 function toggleCard(head) {
   const body = head.nextElementSibling;
@@ -1643,7 +1702,8 @@ function openAddInvoiceModal() {
   document.getElementById('inv-vendor').value = '';
   document.getElementById('inv-amount').value = '';
   document.getElementById('inv-status').value = 'unpaid';
-  document.getElementById('inv-paytype').value = '';
+  selectInvPayType('');
+  document.getElementById('inv-check-num').value = '';
   document.getElementById('inv-notes').value = '';
   populateVendorSelect();
   document.getElementById('inv-modal').style.display = 'flex';
@@ -1660,7 +1720,8 @@ function openEditInvoiceModal(id) {
   document.getElementById('inv-num').value = inv.num || '';
   document.getElementById('inv-amount').value = inv.amount || '';
   document.getElementById('inv-status').value = inv.status || 'unpaid';
-  document.getElementById('inv-paytype').value = inv.paytype || '';
+  selectInvPayType(inv.paytype || '');
+  document.getElementById('inv-check-num').value = inv.checkNumber || '';
   document.getElementById('inv-notes').value = inv.notes || '';
   populateVendorSelect();
   // Set vendor - check if in list or custom
@@ -1684,11 +1745,10 @@ function closeInvoiceModal() {
 }
 
 function populateVendorSelect() {
-  const vendors = ['Mi Mexico','EMD','Costco','Restaurant Depot','Sysco','US Foods','Pepsi','Coca-Cola','Modelo','Performance Food Group'];
-  // Also add any vendors already in invoices
-  const existing = [...new Set(invoices.map(i=>i.vendor).filter(Boolean))];
-  const all = [...new Set([...vendors, ...existing])].sort();
+  loadVendorData();
+  const all = vendorList.map(v=>v.name).sort();
   const sel = document.getElementById('inv-vendor-select');
+  if(!sel) return;
   const cur = sel.value;
   sel.innerHTML = '<option value="">— Select vendor —</option>' + all.map(v=>`<option value="${v}">${v}</option>`).join('');
   if(cur) sel.value = cur;
@@ -1716,22 +1776,24 @@ async function saveInvoiceModal() {
   const amount = parseFloat(document.getElementById('inv-amount').value)||0;
   if(!vendor) { showToast('Enter a vendor name'); return; }
   if(!amount) { showToast('Enter an amount'); return; }
+  const paytype = document.getElementById('inv-paytype').value;
+  const checkNum = paytype==='check' ? document.getElementById('inv-check-num').value.trim() : '';
   const inv = {
     date: document.getElementById('inv-date').value,
     num: document.getElementById('inv-num').value,
     vendor, amount,
     status: document.getElementById('inv-status').value,
-    paytype: document.getElementById('inv-paytype').value,
+    paytype, checkNumber: checkNum,
     notes: document.getElementById('inv-notes').value
   };
   if(id) {
     // Edit existing
     const dbUpd = {vendor:inv.vendor, invoice_date:inv.date, invoice_num:inv.num, amount:inv.amount,
-      status:inv.status, pay_type:inv.paytype||null, notes:inv.notes||null, updated_at:new Date().toISOString()};
+      status:inv.status, pay_type:inv.paytype||null, check_number:inv.checkNumber||null, notes:inv.notes||null, updated_at:new Date().toISOString()};
     try {
       await apiPut('/api/invoices/'+id, dbUpd);
       const local = invoices.find(i=>i.id===id);
-      if(local) Object.assign(local, {date:inv.date,num:inv.num,vendor:inv.vendor,amount:inv.amount,status:inv.status,paytype:inv.paytype,notes:inv.notes});
+      if(local) Object.assign(local, {date:inv.date,num:inv.num,vendor:inv.vendor,amount:inv.amount,status:inv.status,paytype:inv.paytype,checkNumber:inv.checkNumber,notes:inv.notes});
       closeInvoiceModal();
       renderInvoices();
       showToast('Invoice updated');
@@ -1931,8 +1993,10 @@ function filterInvoices() {
 
   let filtered = invoices.filter(inv => {
     const matchVendor = !q || (inv.vendor||'').toLowerCase().includes(q);
+    const matchNum = !q || (inv.num||'').toLowerCase().includes(q);
+    const matchAmount = !q || String(inv.amount||'').includes(q);
     const matchStatus = status === 'all' || inv.status === status;
-    return matchVendor && matchStatus;
+    return (matchVendor || matchNum || matchAmount) && matchStatus;
   });
 
   resultsDiv.style.display = 'block';
@@ -2036,7 +2100,7 @@ function renderInvoices() {
       </div>
       <table class="inv-table"><thead><tr>
         <th style="width:32px"><input type="checkbox" id="select-all-cb" onclick="toggleSelectAll(this)"></th>
-        <th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Pay Type</th><th></th>
+        <th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Notes</th><th></th>
       </tr></thead><tbody>${
         unpaid.map(inv => `<tr>
           <td><input type="checkbox" class="inv-cb" data-id="${inv.id}" data-amount="${inv.amount}" onchange="updateBulkBar()"></td>
@@ -2044,7 +2108,7 @@ function renderInvoices() {
           <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
           <td>${inv.vendor}</td>
           <td class="num">${fmtMoney(inv.amount)}</td>
-          <td>—</td>
+          <td style="font-size:12px;color:var(--muted);max-width:120px">${inv.notes||'—'}</td>
           <td style="display:flex;gap:4px">
             <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')">Edit</button>
             <button class="item-save" onclick="markPaid('${inv.id}')">Pay</button>
@@ -2058,7 +2122,7 @@ function renderInvoices() {
   if(!invoices.length) {
     allContainer.innerHTML = '<div class="empty-state"><div>📋</div>No invoices yet</div>';
   } else {
-    allContainer.innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th>Paid Date</th><th></th></tr></thead><tbody>${
+    allContainer.innerHTML = `<table class="inv-table"><thead><tr><th>Date</th><th>Invoice #</th><th>Vendor</th><th>Amount</th><th>Status</th><th>Pay Type</th><th>Paid Date</th><th>Notes</th><th></th></tr></thead><tbody>${
       invoices.map(inv => `<tr>
         <td>${inv.date}</td>
         <td style="font-family:var(--mono);font-size:12px">${inv.num||'—'}</td>
@@ -2067,6 +2131,7 @@ function renderInvoices() {
         <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
         <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
         <td style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</td>
+        <td style="font-size:12px;color:var(--muted);max-width:120px">${inv.notes||'—'}</td>
         <td style="display:flex;gap:4px">
           <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')" style="background:var(--blue-l);color:var(--blue);border-color:var(--blue)">Edit</button>
           ${inv.status==='paid' ? `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>` : ''}
@@ -2527,6 +2592,99 @@ function renderCatProjections() {
       <div style="font-size:11px;color:var(--hint);margin-top:6px">${days} days recorded · ${daysInMo} days in month</div>
     </div>`;
   }).join('');
+}
+
+// Vendor data stored locally + supabase eventually
+let vendorList = [];
+
+function selectInvPayType(val) {
+  document.getElementById('inv-paytype').value = val;
+  document.querySelectorAll('input[name="inv-pt"]').forEach(r => r.checked = r.value === val);
+  // Highlight selected label
+  document.querySelectorAll('label[onclick^="selectInvPayType"]').forEach(l => {
+    const r = l.querySelector('input[type="radio"]');
+    l.style.borderColor = r?.value === val && val ? 'var(--green)' : 'var(--border2)';
+    l.style.background = r?.value === val && val ? 'var(--green-l)' : 'white';
+  });
+  document.getElementById('inv-check-row').style.display = val === 'check' ? 'block' : 'none';
+  if(val !== 'check') document.getElementById('inv-check-num').value = '';
+}
+
+function addVendor() {
+  const name = document.getElementById('vm-name').value.trim();
+  const type = document.getElementById('vm-type').value;
+  const notes = document.getElementById('vm-notes').value.trim();
+  if(!name) { showToast('Enter a vendor name'); return; }
+  if(vendorList.find(v=>v.name.toLowerCase()===name.toLowerCase())) { showToast('Vendor already exists'); return; }
+  vendorList.push({id: Date.now().toString(), name, type, notes});
+  saveVendorList();
+  document.getElementById('vm-name').value='';
+  document.getElementById('vm-type').value='';
+  document.getElementById('vm-notes').value='';
+  renderVendorList();
+  showToast('Vendor added');
+}
+
+function editVendor(id) {
+  const v = vendorList.find(x=>x.id===id);
+  if(!v) return;
+  const name = prompt('Vendor name:', v.name);
+  if(name === null) return;
+  const type = prompt('Type (Purchase/Repair/Office Supplies/Utilities/Services/Other):', v.type||'');
+  const notes = prompt('Notes:', v.notes||'');
+  v.name = name.trim() || v.name;
+  v.type = type || v.type;
+  v.notes = notes || '';
+  saveVendorList();
+  renderVendorList();
+  showToast('Vendor updated');
+}
+
+function deleteVendor(id) {
+  const v = vendorList.find(x=>x.id===id);
+  if(!v) return;
+  if(!confirm(`Delete vendor "${v.name}"? This won't delete their invoices.`)) return;
+  vendorList = vendorList.filter(x=>x.id!==id);
+  saveVendorList();
+  renderVendorList();
+  showToast('Vendor deleted');
+}
+
+function saveVendorList() {
+  try { localStorage.setItem('vendorList', JSON.stringify(vendorList)); } catch(e){}
+}
+
+function loadVendorData() {
+  try {
+    const saved = localStorage.getItem('vendorList');
+    if(saved) vendorList = JSON.parse(saved);
+    // Merge with invoice vendors
+    const invVendors = [...new Set(invoices.map(i=>i.vendor).filter(Boolean))];
+    invVendors.forEach(name => {
+      if(!vendorList.find(v=>v.name===name)) vendorList.push({id:name, name, type:'', notes:''});
+    });
+  } catch(e) {}
+}
+
+function renderVendorList() {
+  const el = document.getElementById('vendor-list-body');
+  if(!el) return;
+  if(!vendorList.length) { el.innerHTML='<div class="empty-state"><div>🏪</div>No vendors yet</div>'; return; }
+  const grouped = {};
+  vendorList.forEach(v => { const t=v.type||'Other'; if(!grouped[t]) grouped[t]=[]; grouped[t].push(v); });
+  el.innerHTML = Object.entries(grouped).map(([type,vends]) => `
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;margin-bottom:6px;padding-bottom:4px;border-bottom:0.5px solid var(--border)">${type}</div>
+      ${vends.map(v=>`
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:500">${v.name}</div>
+            ${v.notes?`<div style="font-size:11px;color:var(--muted)">${v.notes}</div>`:''}
+          </div>
+          <button class="item-save" onclick="editVendor('${v.id}')" style="background:var(--blue-l);color:var(--blue);border-color:var(--blue)">Edit</button>
+          <button class="item-save" onclick="deleteVendor('${v.id}')" style="background:var(--red-l);color:var(--red);border-color:var(--red)">Delete</button>
+        </div>`).join('')}
+    </div>`).join('');
 }
 
 function showToast(msg) {
