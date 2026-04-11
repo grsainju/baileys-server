@@ -1905,9 +1905,8 @@ async function saveInvoiceModal() {
 }
 
 function loadVendorList() {
-  const vendors = ['Mi Mexico','EMD','Costco','Restaurant Depot','Sysco','US Foods','Pepsi','Coca-Cola','Modelo','Performance Food Group'];
-  const dl = document.getElementById('vendor-list');
-  dl.innerHTML = vendors.map(v => `<option value="${v}">`).join('');
+  // Legacy function - vendor list now managed in Vendor Manager
+  // datalist element removed from form, skip safely
 }
 async function addInvoice() {
   const inv = {
