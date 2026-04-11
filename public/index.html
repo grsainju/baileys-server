@@ -632,6 +632,106 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       </div>
     </div>
 
+    <!-- EDIT REPORTS PAGE (OWNER) -->
+    <div class="page" id="page-edit">
+      <div class="page-header">
+        <div class="page-title">Edit Reports</div>
+        <div class="page-sub">Load and modify any saved daily report, machine report, or invoice</div>
+      </div>
+
+      <!-- SELECT DATE -->
+      <div class="card">
+        <div class="card-head" onclick="toggleCard(this)">
+          <div class="card-icon" style="background:#eaf0fb">📅</div>
+          <div class="card-title">Load Daily Report for Editing</div>
+          <div class="card-chevron open">▼</div>
+        </div>
+        <div class="card-body open">
+          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+            <div class="fgroup" style="flex:1">
+              <label>Select Date</label>
+              <input type="date" id="edit-date" style="font-family:var(--font);font-size:14px;padding:8px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none">
+            </div>
+            <button onclick="loadReportForEdit()" class="submit-btn" style="margin-bottom:1px">Load Report</button>
+          </div>
+          <div id="edit-status" style="margin-top:10px;font-size:13px;color:var(--muted)"></div>
+        </div>
+      </div>
+
+      <!-- EDIT FORM - shown after loading -->
+      <div id="edit-form" style="display:none">
+        <div class="card">
+          <div class="card-head" onclick="toggleCard(this)">
+            <div class="card-icon" style="background:#e8f4ed">💰</div>
+            <div class="card-title">Edit Sales</div>
+            <div class="card-chevron open">▼</div>
+          </div>
+          <div class="card-body open">
+            <div class="form-grid fg-3">
+              <div class="fgroup"><label>Cash Sales</label><div class="dollar"><input type="number" id="e-cash" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Credit Card</label><div class="dollar"><input type="number" id="e-credit" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Debit Card</label><div class="dollar"><input type="number" id="e-debit" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>EBT / Food Stamp</label><div class="dollar"><input type="number" id="e-ebt" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Tax Collected</label><div class="dollar"><input type="number" id="e-tax" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Kitchen Sales</label><div class="dollar"><input type="number" id="e-kitchen" step="0.01" placeholder="0.00"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head" onclick="toggleCard(this)">
+            <div class="card-icon" style="background:#fef3e2">📤</div>
+            <div class="card-title">Edit Payouts</div>
+            <div class="card-chevron open">▼</div>
+          </div>
+          <div class="card-body open">
+            <div class="form-grid fg-3">
+              <div class="fgroup"><label>Cash Payout</label><div class="dollar"><input type="number" id="e-pcash" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Lottery Payout</label><div class="dollar"><input type="number" id="e-lottery" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Game Machine Winner</label><div class="dollar"><input type="number" id="e-game" step="0.01" min="0" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Lottery Refund</label><div class="dollar"><input type="number" id="e-lotref" step="0.01" min="0" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>ATM Balance Add</label><div class="dollar"><input type="number" id="e-atm" step="0.01" min="0" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Missing / Extra</label><div class="dollar"><input type="number" id="e-misc" step="0.01" placeholder="0.00"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head" onclick="toggleCard(this)">
+            <div class="card-icon" style="background:#e8f4ed">🏦</div>
+            <div class="card-title">Edit Cash Deposit</div>
+            <div class="card-chevron open">▼</div>
+          </div>
+          <div class="card-body open">
+            <div class="form-grid fg-3">
+              <div class="fgroup"><label>POS Cash</label><div class="dollar"><input type="number" id="e-pos" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Lottery Kiosk Cash</label><div class="dollar"><input type="number" id="e-dlottery" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Toy Machine Commission</label><div class="dollar"><input type="number" id="e-toy" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Coin Game Commission</label><div class="dollar"><input type="number" id="e-coin" step="0.01" placeholder="0.00"></div></div>
+              <div class="fgroup"><label>Other Cash</label><div class="dollar"><input type="number" id="e-other" step="0.01" placeholder="0.00"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head" onclick="toggleCard(this)">
+            <div class="card-icon" style="background:#f1efea">📝</div>
+            <div class="card-title">Notes</div>
+            <div class="card-chevron">▼</div>
+          </div>
+          <div class="card-body">
+            <textarea id="e-notes" style="width:100%;min-height:80px;font-family:var(--font);font-size:14px;padding:10px;border:0.5px solid var(--border2);border-radius:7px;resize:vertical;outline:none"></textarea>
+          </div>
+        </div>
+
+        <div class="submit-bar">
+          <button class="submit-btn" onclick="saveEditedReport()">Save Changes</button>
+          <span class="save-note" id="edit-date-label"></span>
+          <span class="save-success" id="edit-saved">✓ Changes saved</span>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -728,6 +828,7 @@ const OWNER_TABS = [
   {id:'dashboard', label:'Dashboard', owner:true},
   {id:'reports', label:'Weekly Reports', owner:true},
   {id:'prices', label:'Price Manager', owner:true},
+  {id:'edit', label:'Edit Reports', owner:true},
 ];
 
 function login(role) {
@@ -842,15 +943,8 @@ async function parseCloverCSV() {
   const date = document.getElementById('report-date').value;
   if(!date) { showToast('Select a date first'); return; }
 
-  // Warn if pulling today's data before 11pm EST
-  const nowEST = new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
-  const todayEST = nowEST.toISOString().split('T')[0];
-  if(date === todayEST && nowEST.getHours() < 23) {
-    const hour = nowEST.getHours();
-    const min = nowEST.getMinutes();
-    const timeStr = `${hour % 12 || 12}:${min.toString().padStart(2,'0')} ${hour >= 12 ? 'PM' : 'AM'} EST`;
-
-  }
+  // Show inline warning if today and before 11pm
+  checkStoreOpenWarning();
   btn.innerHTML = '<span>⟳</span> Pulling...';
   btn.style.opacity = '0.7';
   status.style.display = 'none';
@@ -1787,6 +1881,82 @@ function confirmOverwrite() {
   document.getElementById('overwrite-modal').style.display = 'none';
   window._skipOverwriteCheck = true;
   submitDailyReport();
+}
+
+async function loadReportForEdit() {
+  const date = document.getElementById('edit-date').value;
+  if(!date) { showToast('Select a date first'); return; }
+  const status = document.getElementById('edit-status');
+  status.textContent = 'Loading...';
+  try {
+    const data = await apiGet('/api/daily?date=' + date);
+    if(!data || !data.length) {
+      status.textContent = 'No report found for ' + date;
+      document.getElementById('edit-form').style.display = 'none';
+      return;
+    }
+    const r = data[0];
+    document.getElementById('e-cash').value = r.sales_cash || '';
+    document.getElementById('e-credit').value = r.sales_credit || '';
+    document.getElementById('e-debit').value = r.sales_debit || '';
+    document.getElementById('e-ebt').value = r.sales_ebt || '';
+    document.getElementById('e-tax').value = r.sales_tax || '';
+    document.getElementById('e-kitchen').value = r.sales_kitchen || '';
+    document.getElementById('e-pcash').value = r.payout_cash || '';
+    document.getElementById('e-lottery').value = r.payout_lottery || '';
+    document.getElementById('e-game').value = r.payout_game || '';
+    document.getElementById('e-lotref').value = r.payout_lottery_refund || '';
+    document.getElementById('e-atm').value = r.payout_atm || '';
+    document.getElementById('e-misc').value = r.payout_misc || '';
+    document.getElementById('e-pos').value = r.deposit_pos || '';
+    document.getElementById('e-dlottery').value = r.deposit_lottery || '';
+    document.getElementById('e-toy').value = r.deposit_toy || '';
+    document.getElementById('e-coin').value = r.deposit_coin || '';
+    document.getElementById('e-other').value = r.deposit_other || '';
+    document.getElementById('e-notes').value = r.notes || '';
+    document.getElementById('edit-date-label').textContent = 'Editing report for ' + date;
+    document.getElementById('edit-form').style.display = 'block';
+    status.textContent = '✓ Report loaded for ' + date;
+    status.style.color = 'var(--green)';
+    window._editingDate = date;
+  } catch(e) {
+    status.textContent = 'Failed to load: ' + e.message;
+  }
+}
+
+async function saveEditedReport() {
+  const date = window._editingDate;
+  if(!date) { showToast('No report loaded'); return; }
+  const getE = id => parseFloat(document.getElementById(id)?.value) || 0;
+  const salesTotal = getE('e-cash')+getE('e-credit')+getE('e-debit')+getE('e-ebt');
+  const payoutTotal = getE('e-pcash')+getE('e-lottery')+getE('e-game')+getE('e-lotref')+getE('e-atm')+getE('e-misc');
+  const depositTotal = getE('e-pos')+getE('e-dlottery')+getE('e-toy')+getE('e-coin')+getE('e-other');
+  const dbRec = {
+    store:'baileys', report_date:date,
+    sales_cash:getE('e-cash'), sales_credit:getE('e-credit'), sales_debit:getE('e-debit'),
+    sales_ebt:getE('e-ebt'), sales_tax:getE('e-tax'), sales_kitchen:getE('e-kitchen'),
+    sales_total:salesTotal,
+    payout_cash:getE('e-pcash'), payout_lottery:getE('e-lottery'), payout_game:getE('e-game'),
+    payout_lottery_refund:getE('e-lotref'), payout_atm:getE('e-atm'), payout_misc:getE('e-misc'),
+    payout_total:payoutTotal,
+    deposit_pos:getE('e-pos'), deposit_lottery:getE('e-dlottery'), deposit_toy:getE('e-toy'),
+    deposit_coin:getE('e-coin'), deposit_other:getE('e-other'), deposit_total:depositTotal,
+    notes:document.getElementById('e-notes').value,
+    updated_at:new Date().toISOString()
+  };
+  try {
+    await apiPost('/api/daily', dbRec);
+    // Update local cache
+    const idx = dailyReports.findIndex(r => r.date === date);
+    const rec = {date, sales:{cash:getE('e-cash'),credit:getE('e-credit'),debit:getE('e-debit'),ebt:getE('e-ebt'),tax:getE('e-tax'),kitchen:getE('e-kitchen'),total:salesTotal},
+      payouts:{cash:getE('e-pcash'),lottery:getE('e-lottery'),game:getE('e-game'),lotteryRefund:getE('e-lotref'),atm:getE('e-atm'),misc:getE('e-misc'),total:payoutTotal},
+      deposit:{pos:getE('e-pos'),lottery:getE('e-dlottery'),toy:getE('e-toy'),coin:getE('e-coin'),other:getE('e-other'),total:depositTotal},
+      notes:document.getElementById('e-notes').value};
+    if(idx>=0) dailyReports[idx]=rec; else dailyReports.push(rec);
+    document.getElementById('edit-saved').style.display = 'inline';
+    setTimeout(()=>document.getElementById('edit-saved').style.display='none', 3000);
+    showToast('Report updated successfully');
+  } catch(e) { showToast('Save failed: ' + e.message); }
 }
 
 function showToast(msg) {
