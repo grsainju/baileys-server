@@ -516,37 +516,10 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
         </div>
       </div>
 
-      <div class="card">
-        <div class="card-head" onclick="toggleCard(this)">
-          <div class="card-icon" style="background:#eaf0fb">➕</div>
-          <div class="card-title">Add New Invoice</div>
-          <div class="card-chevron open">▼</div>
-        </div>
-        <div class="card-body open">
-          <div class="form-grid fg-3">
-            <div class="fgroup"><label>Receipt Date</label><input type="date" id="inv-date"></div>
-            <div class="fgroup"><label>Invoice Number</label><input type="text" id="inv-num" placeholder="e.g. INV-12345"></div>
-            <div class="fgroup"><label>Vendor Name</label><input type="text" id="inv-vendor" placeholder="Vendor name" list="vendor-list"><datalist id="vendor-list"></datalist></div>
-            <div class="fgroup"><label>Amount</label><div class="dollar"><input type="number" id="inv-amount" step="0.01" placeholder="0.00"></div></div>
-            <div class="fgroup"><label>Status</label>
-              <select id="inv-status">
-                <option value="unpaid">Unpaid (received, not paid)</option>
-                <option value="paid">Paid</option>
-              </select>
-            </div>
-            <div class="fgroup"><label>Pay Type</label>
-              <select id="inv-paytype">
-                <option value="">— leave blank if unpaid —</option>
-                <option value="cash">Cash</option>
-                <option value="credit">Credit Card</option>
-                <option value="check">Check</option>
-                <option value="ach">ACH</option>
-              </select>
-            </div>
-          </div>
-          <div class="fgroup"><label>Notes</label><input type="text" id="inv-notes" placeholder="Optional notes"></div>
-          <div style="margin-top:12px"><button class="submit-btn" onclick="addInvoice()">Add Invoice</button></div>
-        </div>
+      <div style="margin-bottom:12px">
+        <button class="submit-btn" onclick="openAddInvoiceModal()" style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:16px">+</span> Add New Invoice
+        </button>
       </div>
 
       <!-- UNPAID -->
@@ -841,6 +814,67 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   </div>
 </div>
 <div class="toast" id="toast"></div>
+
+<!-- ADD / EDIT INVOICE MODAL -->
+<div id="inv-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
+  <div style="background:white;border-radius:14px;padding:24px;width:100%;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,0.18)">
+    <div style="font-size:15px;font-weight:600;margin-bottom:4px" id="inv-modal-title">Add Invoice</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:20px" id="inv-modal-sub">Fill in the invoice details</div>
+    <input type="hidden" id="inv-modal-id">
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="fgroup">
+        <label>Receipt Date</label>
+        <input type="date" id="inv-date" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%">
+      </div>
+      <div class="fgroup">
+        <label>Invoice Number</label>
+        <input type="text" id="inv-num" placeholder="e.g. INV-12345" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%">
+      </div>
+      <div class="fgroup">
+        <label>Vendor Name</label>
+        <div style="display:flex;gap:6px">
+          <select id="inv-vendor-select" onchange="onVendorSelect()" style="flex:1;font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white">
+            <option value="">— Select vendor —</option>
+          </select>
+          <button onclick="showNewVendorInput()" style="background:var(--green-l);color:var(--green);border:0.5px solid var(--green-m);padding:9px 12px;border-radius:7px;font-family:var(--font);font-size:13px;cursor:pointer;white-space:nowrap">+ New</button>
+        </div>
+        <input type="text" id="inv-vendor-new" placeholder="Type new vendor name" style="display:none;margin-top:6px;font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--green);border-radius:7px;outline:none;width:100%">
+        <input type="hidden" id="inv-vendor">
+      </div>
+      <div class="fgroup">
+        <label>Amount</label>
+        <div class="dollar"><input type="number" id="inv-amount" step="0.01" placeholder="0.00" style="font-family:var(--mono);font-size:14px;padding:9px 10px 9px 22px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%;text-align:right"></div>
+      </div>
+      <div class="fgroup">
+        <label>Status</label>
+        <select id="inv-status" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white;width:100%">
+          <option value="unpaid">Unpaid</option>
+          <option value="paid">Paid</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Pay Type</label>
+        <select id="inv-paytype" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;background:white;width:100%">
+          <option value="">— Leave blank if unpaid —</option>
+          <option value="cash">Cash</option>
+          <option value="credit">Credit Card</option>
+          <option value="check">Check</option>
+          <option value="ach">ACH</option>
+        </select>
+      </div>
+      <div class="fgroup">
+        <label>Notes</label>
+        <input type="text" id="inv-notes" placeholder="Optional notes" style="font-family:var(--font);font-size:14px;padding:9px 10px;border:0.5px solid var(--border2);border-radius:7px;outline:none;width:100%">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:20px">
+      <button onclick="saveInvoiceModal()" style="flex:1;background:#1a5c3a;color:white;border:none;padding:10px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer" id="inv-modal-save-btn">Save</button>
+      <button onclick="closeInvoiceModal()" style="padding:10px 16px;background:none;border:0.5px solid #ccc9be;border-radius:8px;font-family:inherit;font-size:14px;cursor:pointer">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- SAVE CONFIRMATION MODAL -->
 <div id="save-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:500;align-items:center;justify-content:center;padding:20px">
@@ -1596,6 +1630,134 @@ async function submitDailyReport() {
 }
 
 // ---- INVOICES ----
+function openAddInvoiceModal() {
+  document.getElementById('inv-modal-title').textContent = 'Add Invoice';
+  document.getElementById('inv-modal-sub').textContent = 'Fill in the invoice details';
+  document.getElementById('inv-modal-save-btn').textContent = 'Save Invoice';
+  document.getElementById('inv-modal-id').value = '';
+  document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inv-num').value = '';
+  document.getElementById('inv-vendor-select').value = '';
+  document.getElementById('inv-vendor-new').style.display = 'none';
+  document.getElementById('inv-vendor-new').value = '';
+  document.getElementById('inv-vendor').value = '';
+  document.getElementById('inv-amount').value = '';
+  document.getElementById('inv-status').value = 'unpaid';
+  document.getElementById('inv-paytype').value = '';
+  document.getElementById('inv-notes').value = '';
+  populateVendorSelect();
+  document.getElementById('inv-modal').style.display = 'flex';
+}
+
+function openEditInvoiceModal(id) {
+  const inv = invoices.find(i=>i.id===id);
+  if(!inv) return;
+  document.getElementById('inv-modal-title').textContent = 'Edit Invoice';
+  document.getElementById('inv-modal-sub').textContent = inv.vendor + (inv.num ? ' · #'+inv.num : '');
+  document.getElementById('inv-modal-save-btn').textContent = 'Save Changes';
+  document.getElementById('inv-modal-id').value = id;
+  document.getElementById('inv-date').value = inv.date || '';
+  document.getElementById('inv-num').value = inv.num || '';
+  document.getElementById('inv-amount').value = inv.amount || '';
+  document.getElementById('inv-status').value = inv.status || 'unpaid';
+  document.getElementById('inv-paytype').value = inv.paytype || '';
+  document.getElementById('inv-notes').value = inv.notes || '';
+  populateVendorSelect();
+  // Set vendor - check if in list or custom
+  const sel = document.getElementById('inv-vendor-select');
+  const opt = [...sel.options].find(o=>o.value===inv.vendor);
+  if(opt) {
+    sel.value = inv.vendor;
+    document.getElementById('inv-vendor').value = inv.vendor;
+    document.getElementById('inv-vendor-new').style.display = 'none';
+  } else {
+    sel.value = '';
+    document.getElementById('inv-vendor-new').value = inv.vendor || '';
+    document.getElementById('inv-vendor-new').style.display = 'block';
+    document.getElementById('inv-vendor').value = inv.vendor || '';
+  }
+  document.getElementById('inv-modal').style.display = 'flex';
+}
+
+function closeInvoiceModal() {
+  document.getElementById('inv-modal').style.display = 'none';
+}
+
+function populateVendorSelect() {
+  const vendors = ['Mi Mexico','EMD','Costco','Restaurant Depot','Sysco','US Foods','Pepsi','Coca-Cola','Modelo','Performance Food Group'];
+  // Also add any vendors already in invoices
+  const existing = [...new Set(invoices.map(i=>i.vendor).filter(Boolean))];
+  const all = [...new Set([...vendors, ...existing])].sort();
+  const sel = document.getElementById('inv-vendor-select');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Select vendor —</option>' + all.map(v=>`<option value="${v}">${v}</option>`).join('');
+  if(cur) sel.value = cur;
+}
+
+function onVendorSelect() {
+  const val = document.getElementById('inv-vendor-select').value;
+  document.getElementById('inv-vendor').value = val;
+  document.getElementById('inv-vendor-new').style.display = 'none';
+  document.getElementById('inv-vendor-new').value = '';
+}
+
+function showNewVendorInput() {
+  document.getElementById('inv-vendor-select').value = '';
+  document.getElementById('inv-vendor').value = '';
+  const inp = document.getElementById('inv-vendor-new');
+  inp.style.display = 'block';
+  inp.focus();
+  inp.oninput = () => { document.getElementById('inv-vendor').value = inp.value; };
+}
+
+async function saveInvoiceModal() {
+  const id = document.getElementById('inv-modal-id').value;
+  const vendor = document.getElementById('inv-vendor').value.trim() || document.getElementById('inv-vendor-new').value.trim();
+  const amount = parseFloat(document.getElementById('inv-amount').value)||0;
+  if(!vendor) { showToast('Enter a vendor name'); return; }
+  if(!amount) { showToast('Enter an amount'); return; }
+  const inv = {
+    date: document.getElementById('inv-date').value,
+    num: document.getElementById('inv-num').value,
+    vendor, amount,
+    status: document.getElementById('inv-status').value,
+    paytype: document.getElementById('inv-paytype').value,
+    notes: document.getElementById('inv-notes').value
+  };
+  if(id) {
+    // Edit existing
+    const dbUpd = {vendor:inv.vendor, invoice_date:inv.date, invoice_num:inv.num, amount:inv.amount,
+      status:inv.status, pay_type:inv.paytype||null, notes:inv.notes||null, updated_at:new Date().toISOString()};
+    try {
+      await apiPut('/api/invoices/'+id, dbUpd);
+      const local = invoices.find(i=>i.id===id);
+      if(local) Object.assign(local, {date:inv.date,num:inv.num,vendor:inv.vendor,amount:inv.amount,status:inv.status,paytype:inv.paytype,notes:inv.notes});
+      closeInvoiceModal();
+      renderInvoices();
+      showToast('Invoice updated');
+    } catch(e) { showToast('Save failed: '+e.message); }
+  } else {
+    // Add new - duplicate check
+    if(inv.num) {
+      const dup = invoices.find(i=>i.num&&i.num.trim().toLowerCase()===inv.num.trim().toLowerCase()&&i.vendor.trim().toLowerCase()===vendor.toLowerCase());
+      if(dup) {
+        const proceed = confirm(`Invoice #${inv.num} from ${vendor} already exists (${dup.date}, ${fmtMoney(dup.amount)}). Add anyway?`);
+        if(!proceed) return;
+      }
+    }
+    const dbInv = {store:'baileys', invoice_date:inv.date, invoice_num:inv.num, vendor:inv.vendor,
+      amount:inv.amount, status:inv.status, pay_type:inv.paytype||null, notes:inv.notes||null};
+    try {
+      const saved = await apiPost('/api/invoices', dbInv);
+      const savedInv = Array.isArray(saved)?saved[0]:saved;
+      invoices.unshift({id:savedInv?.id||Date.now().toString(),...inv});
+      closeInvoiceModal();
+      renderInvoices();
+      showToast('Invoice saved');
+    } catch(e) { showToast('Save failed: '+e.message); }
+  }
+}
+
 function loadVendorList() {
   const vendors = ['Mi Mexico','EMD','Costco','Restaurant Depot','Sysco','US Foods','Pepsi','Coca-Cola','Modelo','Performance Food Group'];
   const dl = document.getElementById('vendor-list');
@@ -1883,7 +2045,10 @@ function renderInvoices() {
           <td>${inv.vendor}</td>
           <td class="num">${fmtMoney(inv.amount)}</td>
           <td>—</td>
-          <td><button class="item-save" onclick="markPaid('${inv.id}')">Mark Paid</button></td>
+          <td style="display:flex;gap:4px">
+            <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')">Edit</button>
+            <button class="item-save" onclick="markPaid('${inv.id}')">Pay</button>
+          </td>
         </tr>`).join('')
       }</tbody></table>`;
   }
@@ -1902,7 +2067,10 @@ function renderInvoices() {
         <td><span class="status-badge badge-${inv.status}">${inv.status==='paid'?'Paid':'Unpaid'}</span></td>
         <td>${inv.paytype ? `<span class="tag tag-blue">${inv.paytype}${inv.checkNumber ? ' #'+inv.checkNumber : ''}</span>` : '—'}</td>
         <td style="font-size:11px;color:var(--hint)">${inv.paidDate||''}</td>
-        <td>${inv.status==='paid' ? `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>` : ''}</td>
+        <td style="display:flex;gap:4px">
+          <button class="item-save" onclick="openEditInvoiceModal('${inv.id}')" style="background:var(--blue-l);color:var(--blue);border-color:var(--blue)">Edit</button>
+          ${inv.status==='paid' ? `<button class="item-save" style="background:var(--red-l);color:var(--red);border-color:var(--red)" onclick="revertUnpaid('${inv.id}')">Revert</button>` : ''}
+        </td>
       </tr>`).join('')
     }</tbody></table>`;
   }
