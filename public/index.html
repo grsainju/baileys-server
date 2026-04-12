@@ -2785,35 +2785,36 @@ function deleteVendor(id) {
 
 function saveVendorList() {
   try { localStorage.setItem('vendorList', JSON.stringify(vendorList)); } catch(e){}
-  // Save non-Purchase types to server so they persist across devices
-  const overrides = {};
-  vendorList.forEach(v => { if(v.type && v.type !== 'Purchase') overrides[v.name] = v.type; });
-  apiPost('/api/settings', {key:'vendorTypes', value:JSON.stringify(overrides)}).catch(()=>{});
+  // Save full vendor list to server so it persists across all devices
+  apiPost('/api/vendors', vendorList).catch(e => console.warn('Vendor save failed:', e));
+  // Update type map
+  _vendorTypeMap = {};
+  vendorList.forEach(v => { if(v.type && v.type !== 'Purchase') _vendorTypeMap[v.name] = v.type; });
 }
 
 async function loadVendorData() {
   try {
-    const saved = localStorage.getItem('vendorList');
-    if(saved) vendorList = JSON.parse(saved);
-    // Merge with invoice vendors
-    const invVendors = [...new Set(invoices.map(i=>i.vendor).filter(Boolean))];
-    invVendors.forEach(name => {
-      if(!vendorList.find(v=>v.name===name)) vendorList.push({id:name, name, type:'Purchase', notes:''});
-    });
-  } catch(e) {}
-  // Load vendor type overrides from server
-  try {
-    const res = await apiGet('/api/settings?key=vendorTypes');
-    if(res && res.value) {
-      _vendorTypeMap = JSON.parse(res.value);
-      // Also update local vendorList with server types
-      Object.entries(_vendorTypeMap).forEach(([name, type]) => {
-        const v = vendorList.find(vl=>vl.name===name);
-        if(v) v.type = type;
-        else vendorList.push({id:name, name, type, notes:''});
-      });
+    // Load vendor list from server (persists across devices)
+    const serverVendors = await apiGet('/api/vendors');
+    if(serverVendors && serverVendors.length > 0) {
+      vendorList = serverVendors;
+      // Build type map
+      _vendorTypeMap = {};
+      serverVendors.forEach(v => { if(v.type && v.type !== 'Purchase') _vendorTypeMap[v.name] = v.type; });
+      localStorage.setItem('vendorList', JSON.stringify(vendorList));
+    } else {
+      // Fall back to localStorage
+      const saved = localStorage.getItem('vendorList');
+      if(saved) { vendorList = JSON.parse(saved); _vendorTypeMap = {}; vendorList.forEach(v=>{if(v.type&&v.type!=='Purchase')_vendorTypeMap[v.name]=v.type;}); }
     }
-  } catch(e) { /* server not available, use local */ }
+  } catch(e) {
+    try { const saved = localStorage.getItem('vendorList'); if(saved) vendorList = JSON.parse(saved); } catch(e2){}
+  }
+  // Merge with invoice vendors (add any missing)
+  const invVendors = [...new Set(invoices.map(i=>i.vendor).filter(Boolean))];
+  invVendors.forEach(name => {
+    if(!vendorList.find(v=>v.name===name)) vendorList.push({id:name, name, type:'Purchase', notes:''});
+  });
 }
 
 const VM_TYPES = ['Purchase','Repair','Office Supplies','Utilities','Services','Other'];
