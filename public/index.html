@@ -1097,18 +1097,19 @@ function toggleCard(head) {
   chev.classList.toggle('open');
 }
 async function init() {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(today.getDate() - 1);
-  const todayStr = today.toISOString().split('T')[0];
-  const yesterdayStr = yesterday.toISOString().split('T')[0];
+  const _initNow = nowEST();
+  const _initYest = new Date(_initNow); _initYest.setDate(_initNow.getDate() - 1);
+  const todayStr = toESTDateStr(_initNow);
+  const yesterdayStr = toESTDateStr(_initYest);
+  const today = _initNow;
+  const yesterday = _initYest;
   document.getElementById('report-date').value = yesterdayStr;
   document.getElementById('machine-date').value = yesterdayStr;
   document.getElementById('inv-date').value = todayStr;
 
   // Load data from database
   try {
-    const now = new Date();
+    const now = nowEST();
     const ym = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
     const [cats, invs, daily, machines] = await Promise.all([
       apiGet('/api/categories'),
@@ -1298,6 +1299,22 @@ async function savePrice(id, name) {
 
 // ---- CALCULATIONS ----
 function fmtMoney(v) { return '$' + Math.abs(v).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+// Always use EST timezone for all date/time operations
+function nowEST() {
+  return new Date(new Date().toLocaleString('en-US', {timeZone:'America/New_York'}));
+}
+function todayEST() {
+  return nowEST().toISOString().split('T')[0];
+}
+function currentMonthEST() {
+  const d = nowEST();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function toESTDateStr(date) {
+  // Convert any date to EST date string YYYY-MM-DD
+  return new Date(date.toLocaleString('en-US', {timeZone:'America/New_York'})).toISOString().split('T')[0];
+}
 function fmtDate(d) {
   if(!d || d === '—') return '—';
   const parts = d.split('-');
@@ -1732,7 +1749,7 @@ function openAddInvoiceModal() {
   document.getElementById('inv-modal-sub').textContent = 'Fill in the invoice details';
   document.getElementById('inv-modal-save-btn').textContent = 'Save Invoice';
   document.getElementById('inv-modal-id').value = '';
-  document.getElementById('inv-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('inv-date').value = todayEST();
   document.getElementById('inv-num').value = '';
   document.getElementById('inv-vendor-select').value = '';
   document.getElementById('inv-vendor-new').style.display = 'none';
@@ -2041,7 +2058,7 @@ async function confirmMarkPaid() {
   if(paytype === 'check' && !checkNum) { showToast('Enter the check number'); document.getElementById('check-number').focus(); return; }
   // Support single or bulk (comma-separated ids)
   const ids = idField.split(',').map(s => s.trim()).filter(Boolean);
-  const paidDate = new Date().toISOString().split('T')[0];
+  const paidDate = todayEST();
   const updates = {status:'paid', pay_type:paytype, paid_date:paidDate, updated_at:new Date().toISOString()};
   if(paytype==='check') updates.check_number = checkNum;
   try {
@@ -2246,7 +2263,7 @@ function changeMonth(dir) {
 }
 
 function updateDashboard() {
-  const now = new Date();
+  const now = nowEST();
   if(!_dashMonth) _dashMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const ym = _dashMonth;
   const [yr, mo] = ym.split('-').map(Number);
@@ -2255,7 +2272,7 @@ function updateDashboard() {
 
   // --- SECTION 1: Last saved report ---
   // Find most recent day before today with data
-  const _todayStr = new Date().toISOString().split('T')[0];
+  const _todayStr2 = todayEST();
   const sorted = [...dailyReports].filter(r=>r.date && r.date < _todayStr).sort((a,b)=>b.date.localeCompare(a.date));
   const last = sorted[0];
   if(last) {
@@ -2370,7 +2387,7 @@ function updateDashboard() {
 
   // Weekly bars
   // Week starts Monday - find this week's Monday
-  const _today = new Date();
+  const _today = nowEST();
   const _dow = _today.getDay(); // 0=Sun,1=Mon...6=Sat
   const _daysFromMon = (_dow === 0) ? 6 : _dow - 1; // days since Monday
   const weekDays = [0,1,2,3,4,5,6].map(i => {
@@ -2391,7 +2408,7 @@ function updateDashboard() {
   const weekTotal = weekData.reduce((s,d)=>s+d.total,0);
   document.getElementById('weekly-bars').innerHTML = weekData.map(d => {
     const pct = Math.round((d.total/maxVal)*100);
-    const isToday = d.date === _todayStr;
+    const isToday = d.date === _todayStr2 || d.date === todayEST();
     return `<div class="bar-row"><div class="bar-label" style="${isToday?'font-weight:600;color:var(--green)':''}">${d.label}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${d.total>0?'var(--green)':'var(--border)'}"></div></div><div class="bar-val">${d.total>0?fmtMoney(d.total):'—'}</div></div>`;
   }).join('') + `<div class="bar-row" style="border-top:0.5px solid var(--border);margin-top:6px;padding-top:6px">
     <div class="bar-label" style="font-weight:600">Total</div>
@@ -2669,7 +2686,7 @@ function saveCatPicks() {
 }
 
 function renderCatProjections() {
-  const ym = _dashMonth || new Date().toISOString().slice(0,7);
+  const ym = _dashMonth || currentMonthEST();
   const monthReports = dailyReports.filter(r=>r.date&&r.date.startsWith(ym));
   const picks = [1,2,3].map(i=>document.getElementById(`cat-pick-${i}`)?.value||'').filter(Boolean);
   const el = document.getElementById('cat-proj-results');
@@ -2873,7 +2890,7 @@ function exportInvoicesCSV() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `baileys-invoices-${new Date().toISOString().split('T')[0]}.csv`;
+  a.download = `baileys-invoices-${todayEST()}.csv`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('Invoices exported to CSV');
@@ -2886,7 +2903,7 @@ function updateBusinessIntelligence() {
     el.innerHTML = '<div class="empty-state"><div>📊</div>Save at least one daily report to see insights</div>';
     return;
   }
-  const ym = _dashMonth || new Date().toISOString().slice(0,7);
+  const ym = _dashMonth || currentMonthEST();
   const monthReports = dailyReports.filter(r=>r.date&&r.date.startsWith(ym));
   const allReports = [...dailyReports].sort((a,b)=>a.date.localeCompare(b.date));
   const exclude = ['BOSS RECARGAS','Uncategorized','Misc'];
@@ -2920,7 +2937,8 @@ function updateBusinessIntelligence() {
 
   // Month over month trend (last 2 months)
   const now = new Date();
-  const prevYm = new Date(now.getFullYear(), now.getMonth()-1, 1).toISOString().slice(0,7);
+  const _prevDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const prevYm = _prevDate.getFullYear() + '-' + String(_prevDate.getMonth()+1).padStart(2,'0');
   const prevReports = dailyReports.filter(r=>r.date&&r.date.startsWith(prevYm));
   const curSales = monthReports.reduce((s,r)=>{const boss=(r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;return s+(r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;},0);
   const prevSales = prevReports.reduce((s,r)=>{const boss=(r.category_sales||[]).find(c=>c.name==='BOSS RECARGAS')?.netSales||0;return s+(r.sales?.cash||0)+(r.sales?.credit||0)+(r.sales?.debit||0)+(r.sales?.ebt||0)-(r.sales?.tax||0)-boss;},0);
