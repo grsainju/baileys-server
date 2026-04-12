@@ -3033,10 +3033,13 @@ function updateBusinessIntelligence() {
 }
 
 // Server-loaded vendor type overrides (loaded at init)
-let _vendorTypeMap = {};
+// Bootstrap with known non-purchase vendors so calculations work even before server loads
+let _vendorTypeMap = {
+  'HomeDepot-4-Office': 'Office Supplies'
+};
 
 function getPurchaseType(inv) {
-  // Check server-loaded map first
+  // Check server-loaded map first (most authoritative)
   if(_vendorTypeMap[inv.vendor]) return _vendorTypeMap[inv.vendor];
   // Then check local vendorList
   const v = vendorList.find(vl => vl.name === inv.vendor);
